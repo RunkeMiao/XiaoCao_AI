@@ -1,0 +1,64 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 环境变量文件（包含敏感信息）
+.env
+.env.*.local
+
+# Editor directories and files
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### VS Code ###
+.vscode/*
+!.vscode/extensions.json
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/nbdist/
+/.nb-gradle/
+
+# ==================== Frontend ====================
+aichat-frontend/node_modules
+aichat-frontend/dist
+aichat-frontend/dist-ssr
+aichat-frontend/*.local
+
+# ==================== Backend ====================
+aichat-backend/target/
+aichat-backend/.mvn/wrapper/maven-wrapper.jar
+!aichat-backend/**/src/main/**/target/
+!aichat-backend/**/src/test/**/target/
+
+aichat-backend/build/
+!aichat-backend/**/src/main/**/build/
+!aichat-backend/**/src/test/**/build/
+
+# 敏感配置文件（真正的配置，包含密钥）
+aichat-backend/src/main/resources/application.yml
