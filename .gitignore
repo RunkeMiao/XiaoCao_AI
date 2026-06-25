@@ -28,6 +28,7 @@ lerna-debug.log*
 ### VS Code ###
 .vscode/*
 !.vscode/extensions.json
+/aichat-frontend/.vscode/
 
 ### STS ###
 .apt_generated
@@ -62,3 +63,4 @@ aichat-backend/build/
 
 # 敏感配置文件（真正的配置，包含密钥）
 aichat-backend/src/main/resources/application.yml
+
