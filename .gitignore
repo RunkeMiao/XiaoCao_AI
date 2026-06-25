@@ -56,6 +56,7 @@ aichat-backend/target/
 aichat-backend/.mvn/wrapper/maven-wrapper.jar
 !aichat-backend/**/src/main/**/target/
 !aichat-backend/**/src/test/**/target/
+/aichat-backend/src/test/
 
 aichat-backend/build/
 !aichat-backend/**/src/main/**/build/
@@ -63,4 +64,3 @@ aichat-backend/build/
 
 # 敏感配置文件（真正的配置，包含密钥）
 aichat-backend/src/main/resources/application.yml
-
