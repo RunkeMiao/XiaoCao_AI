@@ -78,7 +78,7 @@
               v-model="input"
               @keydown.enter.exact.prevent="handleSend"
               @input="autoResizeChatInput"
-              placeholder="输入消息... (Enter 发送)"
+              placeholder="问问XiaoCaoAI"
               rows="1"
               :disabled="isStreaming"
           ></textarea>
@@ -101,7 +101,7 @@
 </template>
 
 <script setup>
-import {ref, watch, nextTick} from 'vue'
+import {ref, watch, nextTick, onMounted} from 'vue'
 import {useChat} from './composables/useChat.js'
 import {useTheme} from './composables/useTheme.js'
 import ChatMessage from './components/ChatMessage.vue'
@@ -119,6 +119,12 @@ async function handleSend() {
   const text = input.value.trim()
   if (!text) return
   input.value = ''
+  // 立即重置输入框高度并保持焦点
+  const el = chatInputRef.value || inputRef.value
+  if (el) {
+    el.style.height = 'auto'
+    el.focus()
+  }
   await sendMessage(text)
 }
 
@@ -140,35 +146,50 @@ function autoResizeChatInput() {
   el.style.height = el.scrollHeight + 'px'
 }
 
-// 自动滚到底部
-watch(messages, async () => {
+// 自动滚到底部（页面加载时也触发）
+watch([messages, sessionId], async () => {
   await nextTick()
+  await new Promise(r => setTimeout(r, 50))
   if (messagesRef.value) {
     messagesRef.value.scrollTop = messagesRef.value.scrollHeight
   }
-}, {deep: true})
+}, {deep: true, immediate: true})
+
+// 页面加载后滚到底部（兜底）
+onMounted(async () => {
+  await nextTick()
+  await new Promise(r => setTimeout(r, 100))
+  if (messagesRef.value) {
+    messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+  }
+})
 </script>
 
 <style>
 /* ===== CSS 变量（主题） ===== */
 :root,
 [data-theme="dark"] {
-  --bg-primary: #0d0d12;
+  --bg-primary: #0f0f0f;
   --bg-secondary: #14141c;
-  --sidebar-bg: #111118;
+  --sidebar-bg: #1f1f1f;
   --surface: #1a1a26;
   --border-color: #252535;
   --hover-bg: rgba(255, 255, 255, 0.04);
-  --active-bg: rgba(99, 102, 241, 0.12);
+  --active-bg: rgba(255, 255, 255, 0.08);
   --text-primary: #eaeaf0;
   --text-secondary: #9999aa;
   --text-muted: #55556a;
-  --accent-color: #6366f1;
-  --accent-light: #818cf8;
-  --user-bubble: #2a2a3e;
+  --accent-color: #e0e0e0;
+  --accent-light: #ffffff;
+  --user-bubble: #171717;
   --ai-bubble: #1c1c28;
-  --input-bg: #1a1a26;
+  --input-bg: #1e1f20;
   --scrollbar-thumb: #2a2a3e;
+  --code-block-bg: #2a2a2a;
+  --code-block-border: rgba(255, 255, 255, 0.12);
+  --code-block-color: #d4d4d8;
+  --inline-code-bg: rgba(255, 255, 255, 0.10);
+  --inline-code-color: #b0b0c0;
 }
 
 [data-theme="light"] {
@@ -178,16 +199,21 @@ watch(messages, async () => {
   --surface: #ffffff;
   --border-color: #e5e7ef;
   --hover-bg: rgba(0, 0, 0, 0.03);
-  --active-bg: rgba(99, 102, 241, 0.08);
+  --active-bg: rgba(0, 0, 0, 0.06);
   --text-primary: #1a1a2e;
   --text-secondary: #55557a;
   --text-muted: #9999aa;
-  --accent-color: #6366f1;
-  --accent-light: #4f46e5;
-  --user-bubble: #eef2ff;
+  --accent-color: #333333;
+  --accent-light: #000000;
+  --user-bubble: #f2f0f0;
   --ai-bubble: #f8f9fc;
   --input-bg: #f0f1f5;
   --scrollbar-thumb: #d1d5db;
+  --code-block-bg: #f0f0f5;
+  --code-block-border: #e0e0ea;
+  --code-block-color: #33334a;
+  --inline-code-bg: rgba(0, 0, 0, 0.06);
+  --inline-code-color: #555555;
 }
 
 /* ===== Reset & Base ===== */
@@ -315,8 +341,8 @@ body {
 }
 
 .welcome-input-wrapper:focus-within {
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08);
+  border-color: #888;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
 }
 
 /* ===== Input Area ===== */
@@ -339,8 +365,8 @@ body {
 }
 
 .input-wrapper:focus-within {
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08);
+  border-color: #888;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
 }
 
 textarea {
@@ -383,7 +409,7 @@ textarea:disabled {
   height: 40px;
   border-radius: 50%;
   border: none;
-  background: var(--accent-color);
+  background: #333;
   color: white;
   cursor: pointer;
   display: flex;
@@ -394,7 +420,7 @@ textarea:disabled {
 }
 
 .btn-send-circle:hover:not(:disabled) {
-  background: var(--accent-light);
+  background: #555;
 }
 
 .btn-send-circle:active:not(:disabled) {

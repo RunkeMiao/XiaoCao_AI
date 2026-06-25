@@ -123,24 +123,38 @@ export function useChat() {
                 if (done) break
 
                 buffer += decoder.decode(value, {stream: true})
-                const lines = buffer.split('\n')
-                buffer = lines.pop() || ''
 
-                for (const line of lines) {
-                    const trimmed = line.trim()
-                    if (trimmed.startsWith('data:')) {
-                        const token = trimmed.substring(5)
-                        if (token) {
-                            messages.value[aiIndex].content += token
+                // SSE 事件以 \n\n 分隔，正确处理包含换行符的内容
+                while (true) {
+                    const eventEnd = buffer.indexOf('\n\n')
+                    if (eventEnd === -1) break
+
+                    const event = buffer.substring(0, eventEnd)
+                    buffer = buffer.substring(eventEnd + 2)
+
+                    // 提取事件中所有 data: 行，用 \n 拼接（SSE 多行 data 规范）
+                    const dataParts = []
+                    for (const line of event.split('\n')) {
+                        if (line.startsWith('data:')) {
+                            dataParts.push(line.slice(5))
                         }
+                    }
+                    if (dataParts.length > 0) {
+                        messages.value[aiIndex].content += dataParts.join('\n')
                     }
                 }
             }
 
-            if (buffer.trim().startsWith('data:')) {
-                const token = buffer.trim().substring(5)
-                if (token) {
-                    messages.value[aiIndex].content += token
+            // 处理缓冲区中剩余的数据
+            if (buffer.trim()) {
+                const dataParts = []
+                for (const line of buffer.split('\n')) {
+                    if (line.startsWith('data:')) {
+                        dataParts.push(line.slice(5))
+                    }
+                }
+                if (dataParts.length > 0) {
+                    messages.value[aiIndex].content += dataParts.join('\n')
                 }
             }
 

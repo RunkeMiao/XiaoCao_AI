@@ -8,6 +8,9 @@ import org.springframework.ai.chat.messages.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -15,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class RedisChatMemory implements ChatMemory {
 
+    private static final Logger log = LoggerFactory.getLogger(RedisChatMemory.class);
     private static final String PREFIX = "chat:mem:";
     private static final int MAX_MESSAGES = 20;
     private static final long TTL_HOURS = 24;
@@ -38,30 +42,39 @@ public class RedisChatMemory implements ChatMemory {
             }
             redis.opsForList().trim(key, -MAX_MESSAGES, -1);
             redis.expire(key, TTL_HOURS, TimeUnit.HOURS);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("序列化消息失败", e);
+        } catch (Exception e) {
+            log.warn("Redis 写入失败，降级跳过记忆存储: {}", e.getMessage());
         }
     }
 
     @Override
     public List<Message> get(String conversationId) {
-        List<String> jsonList = redis.opsForList().range(PREFIX + conversationId, 0, -1);
-        List<Message> result = new ArrayList<>();
-        if (jsonList == null) return result;
-        for (String json : jsonList) {
-            try {
-                MsgDto dto = mapper.readValue(json, MsgDto.class);
-                result.add(dto.toMessage());
-            } catch (JsonProcessingException e) {
-                // 跳过损坏数据
+        try {
+            List<String> jsonList = redis.opsForList().range(PREFIX + conversationId, 0, -1);
+            List<Message> result = new ArrayList<>();
+            if (jsonList == null) return result;
+            for (String json : jsonList) {
+                try {
+                    MsgDto dto = mapper.readValue(json, MsgDto.class);
+                    result.add(dto.toMessage());
+                } catch (JsonProcessingException e) {
+                    // 跳过损坏数据
+                }
             }
+            return result;
+        } catch (Exception e) {
+            log.warn("Redis 读取失败，降级为无记忆模式: {}", e.getMessage());
+            return List.of();
         }
-        return result;
     }
 
     @Override
     public void clear(String conversationId) {
-        redis.delete(PREFIX + conversationId);
+        try {
+            redis.delete(PREFIX + conversationId);
+        } catch (Exception e) {
+            log.warn("Redis 删除失败: {}", e.getMessage());
+        }
     }
 
     record MsgDto(String role, String content) {
