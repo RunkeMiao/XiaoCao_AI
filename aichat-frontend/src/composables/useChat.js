@@ -4,6 +4,10 @@ export function useChat() {
     const messages = ref([])
     const isStreaming = ref(false)
     const sessionId = ref('')
+    // 当前请求的 AbortController（用于终止请求）
+    let abortController = null
+    // 当前 reader（用于终止流式读取）
+    let currentReader = null
     // 对话历史列表
     const chatHistory = ref(JSON.parse(localStorage.getItem('chat-history') || '[]'))
 
@@ -102,6 +106,9 @@ export function useChat() {
         messages.value.push({role: 'ai', content: ''})
         isStreaming.value = true
 
+        // 创建 AbortController 用于终止请求
+        abortController = new AbortController()
+
         await nextTick()
 
         try {
@@ -111,15 +118,16 @@ export function useChat() {
                 body: JSON.stringify({
                     sessionId: sessionId.value,
                     message: text
-                })
+                }),
+                signal: abortController.signal
             })
 
-            const reader = resp.body.getReader()
+            currentReader = resp.body.getReader()
             const decoder = new TextDecoder()
             let buffer = ''
 
             while (true) {
-                const {done, value} = await reader.read()
+                const {done, value} = await currentReader.read()
                 if (done) break
 
                 buffer += decoder.decode(value, {stream: true})
@@ -162,9 +170,26 @@ export function useChat() {
             saveCurrentMessages()
 
         } catch (e) {
-            messages.value[aiIndex].content = '请求出错: ' + e.message
+            // 如果是用户主动终止，不显示错误
+            if (e.name === 'AbortError') {
+                messages.value[aiIndex].content += '\n\n[已停止生成]'
+            } else {
+                messages.value[aiIndex].content = '请求出错: ' + e.message
+            }
         } finally {
             isStreaming.value = false
+            abortController = null
+            currentReader = null
+        }
+    }
+
+    // 停止 AI 生成
+    function stopGeneration() {
+        if (abortController) {
+            abortController.abort()
+        }
+        if (currentReader) {
+            currentReader.cancel()
         }
     }
 
@@ -175,5 +200,5 @@ export function useChat() {
 
     initSession()
 
-    return {messages, isStreaming, sessionId, chatHistory, sendMessage, newSession, switchSession, deleteSession}
+    return {messages, isStreaming, sessionId, chatHistory, sendMessage, stopGeneration, newSession, switchSession, deleteSession}
 }

@@ -48,12 +48,16 @@
     <div class="history-section" v-show="!collapsed">
       <div class="history-label">最近对话</div>
       <div class="history-list">
-        <button
+        <div
             v-for="item in chatHistory"
             :key="item.id"
             class="history-item"
             :class="{ active: item.id === currentSessionId }"
             @click="$emit('switch-session', item.id)"
+            role="button"
+            tabindex="0"
+            @keydown.enter="$emit('switch-session', item.id)"
+            @keydown.space.prevent="$emit('switch-session', item.id)"
         >
           <span class="history-title">{{ item.title }}</span>
           <span class="history-time">{{ formatTime(item.updatedAt) }}</span>
@@ -63,7 +67,7 @@
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
-        </button>
+        </div>
         <div v-if="chatHistory.length === 0" class="history-empty">暂无对话记录</div>
       </div>
     </div>

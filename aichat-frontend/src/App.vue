@@ -82,15 +82,28 @@
               rows="1"
               :disabled="isStreaming"
           ></textarea>
+          <!-- 发送按钮（非流式输出时显示） -->
           <button
+              v-if="!isStreaming"
               class="btn-send-circle"
               @click="handleSend"
-              :disabled="isStreaming || !input.trim()"
+              :disabled="!input.trim()"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                 stroke-linecap="round" stroke-linejoin="round">
+               stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="17" x2="12" y2="7"></line>
               <polyline points="8 11 12 7 16 11"></polyline>
+            </svg>
+          </button>
+          <!-- 停止按钮（流式输出时显示） -->
+          <button
+              v-else
+              class="btn-stop-circle"
+              @click="stopGeneration"
+              title="停止生成"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2"></rect>
             </svg>
           </button>
         </div>
@@ -107,7 +120,7 @@ import {useTheme} from './composables/useTheme.js'
 import ChatMessage from './components/ChatMessage.vue'
 import Sidebar from './components/Sidebar.vue'
 
-const {messages, isStreaming, sessionId, chatHistory, sendMessage, newSession, switchSession, deleteSession} = useChat()
+const {messages, isStreaming, sessionId, chatHistory, sendMessage, stopGeneration, newSession, switchSession, deleteSession} = useChat()
 const {isDark, toggleTheme} = useTheme()
 
 const input = ref('')
@@ -118,14 +131,28 @@ const messagesRef = ref(null)
 async function handleSend() {
   const text = input.value.trim()
   if (!text) return
+  
+  // 清空输入框
   input.value = ''
-  // 立即重置输入框高度并保持焦点
-  const el = chatInputRef.value || inputRef.value
-  if (el) {
-    el.style.height = 'auto'
-    el.focus()
+  
+  // 立即重置输入框高度
+  const currentInput = chatInputRef.value || inputRef.value
+  if (currentInput) {
+    currentInput.style.height = 'auto'
   }
+  
+  // 发送消息
   await sendMessage(text)
+  
+  // 等待 DOM 更新（可能从欢迎页切换到聊天页）
+  await nextTick()
+  
+  // 重新获取输入框引用并聚焦
+  await new Promise(resolve => setTimeout(resolve, 50))
+  const newInput = chatInputRef.value || inputRef.value
+  if (newInput) {
+    newInput.focus()
+  }
 }
 
 function handleNewChat() {
@@ -152,6 +179,13 @@ watch([messages, sessionId], async () => {
   await new Promise(r => setTimeout(r, 50))
   if (messagesRef.value) {
     messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+  }
+  
+  // 消息更新后，保持输入框焦点
+  await nextTick()
+  const inputEl = chatInputRef.value || inputRef.value
+  if (inputEl && !inputEl.disabled) {
+    inputEl.focus()
   }
 }, {deep: true, immediate: true})
 
@@ -430,6 +464,30 @@ textarea:disabled {
 .btn-send-circle:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+/* 停止按钮 */
+.btn-stop-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: #ef4444;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.btn-stop-circle:hover {
+  background: #dc2626;
+}
+
+.btn-stop-circle:active {
+  transform: scale(0.92);
 }
 
 .disclaimer {
