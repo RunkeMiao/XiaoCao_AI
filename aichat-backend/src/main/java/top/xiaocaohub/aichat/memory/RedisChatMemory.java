@@ -11,8 +11,11 @@ import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jakarta.annotation.PostConstruct;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -20,7 +23,8 @@ public class RedisChatMemory implements ChatMemory {
 
     private static final Logger log = LoggerFactory.getLogger(RedisChatMemory.class);
     private static final String PREFIX = "chat:mem:";
-    private static final int MAX_MESSAGES = 20;
+    private static final int MAX_MESSAGES = 10;
+    private static final int MAX_CONTENT_LENGTH = 8000;
     private static final long TTL_HOURS = 24;
 
     private final StringRedisTemplate redis;
@@ -29,6 +33,45 @@ public class RedisChatMemory implements ChatMemory {
     public RedisChatMemory(StringRedisTemplate redis, ObjectMapper mapper) {
         this.redis = redis;
         this.mapper = mapper;
+    }
+
+    @PostConstruct
+    void trimExistingSessions() {
+        try {
+            Set<String> keys = redis.keys(PREFIX + "*");
+            if (keys == null || keys.isEmpty()) {
+                log.info("无聊天记忆需要修剪");
+                return;
+            }
+            int count = 0;
+            for (String key : keys) {
+                Long size = redis.opsForList().size(key);
+                if (size == null || size == 0) continue;
+                log.info("修剪会话: {} ({}条消息)", key, size);
+                // 直接清空重建，确保干净
+                List<String> jsonList = redis.opsForList().range(key, 0, -1);
+                redis.delete(key);
+                if (jsonList == null) continue;
+                // 只保留最后 MAX_MESSAGES 条
+                int start = Math.max(0, jsonList.size() - MAX_MESSAGES);
+                for (int i = start; i < jsonList.size(); i++) {
+                    try {
+                        MsgDto dto = mapper.readValue(jsonList.get(i), MsgDto.class);
+                        String text = dto.content();
+                        if (text.length() > MAX_CONTENT_LENGTH) {
+                            text = text.substring(0, MAX_CONTENT_LENGTH) + "...[已截断]";
+                            dto = new MsgDto(dto.role(), text);
+                        }
+                        redis.opsForList().rightPush(key, mapper.writeValueAsString(dto));
+                    } catch (Exception ignored) {
+                    }
+                }
+                count++;
+            }
+            log.info("启动修剪完成: 处理了 {} 个会话", count);
+        } catch (Exception e) {
+            log.warn("修剪聊天记忆失败: {}", e.getMessage());
+        }
     }
 
     @Override
@@ -84,7 +127,11 @@ public class RedisChatMemory implements ChatMemory {
             else if (msg instanceof AssistantMessage) role = "assistant";
             else if (msg instanceof SystemMessage) role = "system";
             else return null;
-            return new MsgDto(role, msg.getText() != null ? msg.getText() : "");
+            String text = msg.getText() != null ? msg.getText() : "";
+            if (text.length() > MAX_CONTENT_LENGTH) {
+                text = text.substring(0, MAX_CONTENT_LENGTH) + "...[已截断]";
+            }
+            return new MsgDto(role, text);
         }
 
         Message toMessage() {

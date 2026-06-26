@@ -1,5 +1,6 @@
 package top.xiaocaohub.aichat.controller;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
@@ -11,6 +12,7 @@ import top.xiaocaohub.aichat.dto.ChatRequest;
 
 import java.util.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/api")
 public class ChatController {
@@ -59,7 +61,12 @@ public class ChatController {
                 .user(request.message())
                 .advisors(a -> a.param("chat_memory_conversation_id", request.sessionId()))
                 .stream()
-                .content();
+                .content()
+                .onErrorResume(e -> {
+                    // 数据已全部发送，流在 close 阶段报错，静默结束即可
+                    log.warn("SSE 流结束异常（数据已发送）: {}", e.getMessage());
+                    return Flux.empty();
+                });
     }
 
     // ===== 调试接口 =====
@@ -92,5 +99,19 @@ public class ChatController {
         List<String> raw = redis.opsForList().range(key, 0, -1);
         Long ttl = redis.getExpire(key);
         return Map.of("key", key, "ttl", ttl + "s", "count", raw != null ? raw.size() : 0, "data", raw != null ? raw : List.of());
+    }
+
+    /** 清空某个 sessionId 或全部聊天记忆 */
+    @DeleteMapping("/debug/memory")
+    public Map<String, Object> clearMemory(@RequestParam(required = false) String sessionId) {
+        if (sessionId != null && !sessionId.isBlank()) {
+            chatMemory.clear(sessionId);
+            return Map.of("cleared", sessionId);
+        }
+        Set<String> keys = redis.keys("chat:mem:*");
+        if (keys != null && !keys.isEmpty()) {
+            redis.delete(keys);
+        }
+        return Map.of("cleared", "all", "count", keys != null ? keys.size() : 0);
     }
 }

@@ -22,6 +22,29 @@ spring:
         model: ${AI_MODEL:zai-org/GLM-5.2}
         # 温度参数（0-1，越大越随机）
         temperature: ${AI_TEMPERATURE:0.7}
+      # HTTP 超时配置见 ChatConfig.java (OpenAiHttpClientBuilderCustomizer)
+
+  # 数据源配置
+  datasource:
+    # JDBC 连接地址（请替换数据库名和地址）
+    url: ${DB_URL:jdbc:mysql://localhost:3306/aichat?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai}
+    # 数据库用户名
+    username: ${DB_USERNAME:root}
+    # 数据库密码
+    password: ${DB_PASSWORD:your_password_here}
+    # JDBC 驱动
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # JPA 配置
+  jpa:
+    hibernate:
+      # 自动建表策略：update=增量更新, create=每次重建, none=不自动
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    # 打印 SQL（生产环境建议关闭）
+    show-sql: ${JPA_SHOW_SQL:true}
+    properties:
+      hibernate:
+        format_sql: true
 
   # Redis 配置
   data:
@@ -35,6 +58,25 @@ spring:
       # Redis 数据库编号
       database: ${REDIS_DATABASE:0}
 
+  # 邮件配置（用于发送验证码）
+  mail:
+    # SMTP 服务器地址
+    host: ${MAIL_HOST:smtp.qq.com}
+    # SMTP 端口（587=STARTTLS, 465=SSL）
+    port: ${MAIL_PORT:587}
+    # 发件人邮箱
+    username: ${MAIL_USERNAME:your_email@qq.com}
+    # 邮箱授权码（非登录密码）
+    password: ${MAIL_PASSWORD:your_email_authorization_code}
+    properties:
+      mail:
+        smtp:
+          # 启用 SMTP 认证
+          auth: true
+          starttls:
+            # 启用 STARTTLS
+            enable: true
+
 # 必应股票 API 配置
 biying:
   # API 基础地址
@@ -46,3 +88,17 @@ biying:
 server:
   # 服务端口
   port: ${SERVER_PORT:8080}
+
+# JWT 配置
+jwt:
+  # 签名密钥（生产环境务必替换为随机长字符串，至少 32 字节）
+  secret: ${JWT_SECRET:your-jwt-secret-key-at-least-32-bytes-long!!}
+  # Access Token 有效期（毫秒，默认 1 小时）
+  access-expiration: ${JWT_ACCESS_EXPIRATION:3600000}
+  # Refresh Token 有效期（毫秒，默认 7 天）
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+# Cookie 配置
+cookie:
+  # 是否设置 Secure 标志（生产环境 HTTPS 时设为 true）
+  secure: ${COOKIE_SECURE:false}

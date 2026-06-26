@@ -75,14 +75,17 @@
     <!-- 底部用户信息 -->
     <div class="sidebar-footer" v-show="!collapsed">
       <div class="user-card">
-        <div class="user-avatar">U</div>
+        <div class="user-avatar">{{ username ? username.charAt(0).toUpperCase() : 'U' }}</div>
         <div class="user-info">
-          <span class="user-name">用户123</span>
-          <span class="user-email">user@example.com</span>
+          <span class="user-name">{{ username || '未登录' }}</span>
         </div>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
+        <button class="btn-logout" @click="handleLogout" title="退出登录">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
       </div>
     </div>
   </aside>
@@ -90,6 +93,9 @@
 
 <script setup>
 import {ref} from 'vue'
+import {useAuth} from '../composables/useAuth.js'
+
+const {username, logout} = useAuth()
 
 defineProps({
   chatHistory: {type: Array, default: () => []},
@@ -99,6 +105,12 @@ defineProps({
 defineEmits(['new-chat', 'switch-session', 'delete-session'])
 
 const collapsed = ref(false)
+
+function handleLogout() {
+  if (confirm('确定退出登录？')) {
+    logout()
+  }
+}
 
 function formatTime(timestamp) {
   if (!timestamp) return ''
@@ -119,7 +131,7 @@ function formatTime(timestamp) {
   display: flex;
   flex-direction: column;
   background: var(--sidebar-bg);
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid var(--sidebar-border);
   transition: width 0.25s ease, min-width 0.25s ease;
   overflow: hidden;
 }
@@ -140,7 +152,7 @@ function formatTime(timestamp) {
   justify-content: space-between;
   height: 56px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--sidebar-border);
   flex-shrink: 0;
 }
 
@@ -178,7 +190,7 @@ function formatTime(timestamp) {
 }
 
 .btn-toggle:hover {
-  background: var(--hover-bg);
+  background: var(--sidebar-hover);
   color: var(--text-primary);
 }
 
@@ -186,7 +198,7 @@ function formatTime(timestamp) {
 .btn-new-chat {
   margin: 12px 16px;
   padding: 10px 16px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--sidebar-border);
   border-radius: 10px;
   background: transparent;
   color: var(--text-primary);
@@ -208,8 +220,8 @@ function formatTime(timestamp) {
 }
 
 .btn-new-chat:hover {
-  background: var(--hover-bg);
-  border-color: var(--accent-color);
+  background: var(--sidebar-hover);
+  border-color: var(--text-muted);
 }
 
 /* Nav */
@@ -227,7 +239,7 @@ function formatTime(timestamp) {
   padding: 10px 12px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--sidebar-text-muted);
   font-size: 14px;
   cursor: pointer;
   font-family: inherit;
@@ -238,8 +250,8 @@ function formatTime(timestamp) {
 }
 
 .nav-item:hover {
-  background: var(--hover-bg);
-  color: var(--text-primary);
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text);
 }
 
 /* History */
@@ -254,7 +266,7 @@ function formatTime(timestamp) {
 .history-label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--sidebar-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 8px 12px 4px;
@@ -272,7 +284,7 @@ function formatTime(timestamp) {
   padding: 10px 12px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--sidebar-text-muted);
   font-size: 13px;
   cursor: pointer;
   font-family: inherit;
@@ -285,13 +297,13 @@ function formatTime(timestamp) {
 }
 
 .history-item:hover {
-  background: var(--hover-bg);
-  color: var(--text-primary);
+  background: var(--sidebar-session-hover);
+  color: var(--sidebar-text);
 }
 
 .history-item.active {
-  background: var(--active-bg);
-  color: var(--text-primary);
+  background: var(--sidebar-session-active);
+  color: var(--sidebar-text);
 }
 
 .history-title {
@@ -335,8 +347,8 @@ function formatTime(timestamp) {
 }
 
 .btn-delete:hover {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-primary);
 }
 
 .history-empty {
@@ -349,7 +361,7 @@ function formatTime(timestamp) {
 /* Footer */
 .sidebar-footer {
   padding: 12px 16px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--sidebar-border);
 }
 
 .user-card {
@@ -363,15 +375,15 @@ function formatTime(timestamp) {
 }
 
 .user-card:hover {
-  background: var(--hover-bg);
+  background: var(--sidebar-hover);
 }
 
 .user-avatar {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #059669, #10b981);
-  color: white;
+  background: var(--text-primary);
+  color: var(--bg-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -402,5 +414,25 @@ function formatTime(timestamp) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.btn-logout {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.btn-logout:hover {
+  background: var(--sidebar-hover);
+  color: #e74c3c;
 }
 </style>

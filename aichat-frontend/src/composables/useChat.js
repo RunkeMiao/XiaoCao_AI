@@ -1,4 +1,5 @@
 import {ref, nextTick, watch} from 'vue'
+import {post} from '../utils/request.js'
 
 export function useChat() {
     const messages = ref([])
@@ -112,15 +113,15 @@ export function useChat() {
         await nextTick()
 
         try {
-            const resp = await fetch('/api/chat', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    sessionId: sessionId.value,
-                    message: text
-                }),
-                signal: abortController.signal
+            const resp = await post('/api/chat', {
+                sessionId: sessionId.value,
+                message: text
             })
+
+            if (!resp.ok) {
+                const data = await resp.json().catch(() => null)
+                throw new Error(data?.message || `请求失败 (${resp.status})`)
+            }
 
             currentReader = resp.body.getReader()
             const decoder = new TextDecoder()
@@ -173,6 +174,9 @@ export function useChat() {
             // 如果是用户主动终止，不显示错误
             if (e.name === 'AbortError') {
                 messages.value[aiIndex].content += '\n\n[已停止生成]'
+            } else if (messages.value[aiIndex].content) {
+                // 已有内容，说明数据已收到，流异常结束，不覆盖
+                messages.value[aiIndex].content += '\n\n[生成结束]'
             } else {
                 messages.value[aiIndex].content = '请求出错: ' + e.message
             }
