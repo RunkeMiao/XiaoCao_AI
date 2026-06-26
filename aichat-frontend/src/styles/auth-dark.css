@@ -1,0 +1,59 @@
+/* ===== 全局深色模式 - 登录/注册/忘记密码 页面 ===== */
+/* 大部分样式已通过 theme.css 的 CSS 变量控制 */
+/* 此处仅保留无法用 CSS 变量实现的特殊样式（插图渐变等） */
+
+[data-theme="dark"] .login-page {
+  background: var(--bg-secondary);
+}
+
+/* 插图特殊渐变（深色模式下为深灰调） */
+[data-theme="dark"] .illu-base {
+  background: linear-gradient(135deg, #21262d 0%, #30363d 100%);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .illu-card {
+  background: linear-gradient(180deg, #21262d 0%, #161b22 100%);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .card-dots span {
+  background: #e6edf3;
+}
+
+[data-theme="dark"] .card-dots span:nth-child(2) {background: #8b949e;}
+[data-theme="dark"] .card-dots span:nth-child(3) {background: #484f58;}
+
+[data-theme="dark"] .card-line {
+  background: linear-gradient(90deg, #484f58, #30363d);
+  opacity: 0.5;
+}
+
+/* 浮动装饰 - 深色模式下为灰调 */
+[data-theme="dark"] .deco-1 {
+  background: linear-gradient(135deg, #30363d, #484f58); opacity: 0.5;
+}
+[data-theme="dark"] .deco-2 {
+  background: linear-gradient(135deg, #21262d, #30363d); opacity: 0.4;
+}
+[data-theme="dark"] .deco-3 {
+  background: linear-gradient(135deg, #30363d, #21262d); opacity: 0.4;
+}
+[data-theme="dark"] .deco-4 {
+  background: #30363d; opacity: 0.3;
+}
+[data-theme="dark"] .deco-5 {
+  background: #21262d; opacity: 0.3;
+}
+
+/* Google 登录按钮深色模式 */
+[data-theme="dark"] .btn-google {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .btn-google:hover {
+  background: var(--hover-bg);
+  border-color: var(--text-muted);
+}

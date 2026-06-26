@@ -13,7 +13,7 @@ import { ref, watch } from 'vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import DOMPurify from 'dompurify'
-import 'highlight.js/styles/github-dark.css'
+// highlight.js CSS 通过 theme.css 的 CSS 变量控制，不在这里硬编码导入
 
 // 配置 marked：换行、GFM、代码高亮
 marked.setOptions({
@@ -89,13 +89,13 @@ watch(
 }
 
 .bubble.ai {
-  background: transparent;
+  background: var(--bubble-ai-bg);
   color: var(--text-primary);
 }
 
 .bubble.user {
-  background: var(--user-bubble);
-  color: var(--text-primary);
+  background: var(--bubble-user-bg);
+  color: var(--bubble-user-text);
   border-radius: 40px;
 }
 
@@ -177,6 +177,20 @@ watch(
   line-height: 1.65;
   color: var(--code-block-color);
 }
+/* 覆盖 highlight.js 默认颜色，确保跟随主题 */
+.markdown-body :deep(.hljs) {
+  background: var(--code-block-bg) !important;
+  color: var(--code-block-color) !important;
+}
+.markdown-body :deep(.hljs-keyword) { color: var(--hljs-keyword) !important; }
+.markdown-body :deep(.hljs-string) { color: var(--hljs-string) !important; }
+.markdown-body :deep(.hljs-comment) { color: var(--hljs-comment) !important; font-style: italic; }
+.markdown-body :deep(.hljs-number) { color: var(--hljs-number) !important; }
+.markdown-body :deep(.hljs-built_in) { color: var(--hljs-builtin) !important; }
+.markdown-body :deep(.hljs-title) { color: var(--hljs-title) !important; }
+.markdown-body :deep(.hljs-params) { color: var(--hljs-params) !important; }
+.markdown-body :deep(.hljs-attr) { color: var(--hljs-attr) !important; }
+.markdown-body :deep(.hljs-type) { color: var(--hljs-type) !important; }
 
 /* 列表 */
 .markdown-body :deep(ul),
@@ -190,7 +204,7 @@ watch(
 
 /* 引用块 */
 .markdown-body :deep(blockquote) {
-  border-left: 3px solid #999;
+  border-left: 3px solid var(--blockquote-border);
   padding-left: 14px;
   margin: 10px 0;
   color: var(--text-secondary);
@@ -210,12 +224,15 @@ watch(
   text-align: left;
 }
 .markdown-body :deep(th) {
-  background: #444;
-  color: white;
+  background: var(--table-head-bg);
+  color: var(--table-head-text);
   font-weight: 600;
 }
+.markdown-body :deep(td) {
+  border-color: var(--table-border);
+}
 .markdown-body :deep(tr:nth-child(even)) {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--table-row-even);
 }
 
 /* 分割线 */
@@ -227,7 +244,7 @@ watch(
 
 /* 链接 */
 .markdown-body :deep(a) {
-  color: #333;
+  color: var(--link-color);
   text-decoration: none;
 }
 .markdown-body :deep(a:hover) {

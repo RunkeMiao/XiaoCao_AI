@@ -1,5 +1,18 @@
 <template>
-  <aside class="sidebar" :class="{ collapsed }">
+  <!-- 移动端遮罩层 -->
+  <div v-if="isMobile && !collapsed" class="sidebar-overlay" @click="collapsed = true"></div>
+
+  <aside class="sidebar" :class="{ collapsed, 'mobile': isMobile }">
+    <!-- 退出登录确认弹窗 -->
+    <ConfirmModal
+      v-model:visible="showLogoutModal"
+      title="退出登录"
+      message="确定要退出当前账号吗？退出后需要重新登录才能使用。"
+      confirm-text="退出"
+      cancel-text="取消"
+      type="warning"
+      @confirm="confirmLogout"
+    />
     <!-- Logo 区域 -->
     <div class="sidebar-header" :class="{ collapsed }">
       <div class="logo" v-show="!collapsed">
@@ -17,7 +30,7 @@
     </div>
 
     <!-- 新对话按钮 -->
-    <button class="btn-new-chat" @click="$emit('new-chat')">
+    <button class="btn-new-chat" @click="handleNewChat">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="12" y1="5" x2="12" y2="19"></line>
         <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -53,11 +66,11 @@
             :key="item.id"
             class="history-item"
             :class="{ active: item.id === currentSessionId }"
-            @click="$emit('switch-session', item.id)"
+            @click="handleSwitchSession(item.id)"
             role="button"
             tabindex="0"
-            @keydown.enter="$emit('switch-session', item.id)"
-            @keydown.space.prevent="$emit('switch-session', item.id)"
+            @keydown.enter="handleSwitchSession(item.id)"
+            @keydown.space.prevent="handleSwitchSession(item.id)"
         >
           <span class="history-title">{{ item.title }}</span>
           <span class="history-time">{{ formatTime(item.updatedAt) }}</span>
@@ -75,30 +88,87 @@
     <!-- 底部用户信息 -->
     <div class="sidebar-footer" v-show="!collapsed">
       <div class="user-card">
-        <div class="user-avatar">U</div>
+        <div class="user-avatar">{{ displayName ? displayName.charAt(0).toUpperCase() : 'U' }}</div>
         <div class="user-info">
-          <span class="user-name">用户123</span>
-          <span class="user-email">user@example.com</span>
+          <span class="user-name">{{ displayName || '未登录' }}</span>
         </div>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
+        <button class="btn-logout" @click="handleLogout" title="退出登录">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
       </div>
     </div>
   </aside>
 </template>
 
 <script setup>
-import {ref} from 'vue'
+import {ref, computed, onMounted, onUnmounted} from 'vue'
+import {useAuth} from '../composables/useAuth.js'
+import ConfirmModal from './ConfirmModal.vue'
 
-defineProps({
+const {username, realName, logout} = useAuth()
+
+// 优先显示真实姓名，否则显示用户名
+const displayName = computed(() => realName.value || username.value)
+
+const props = defineProps({
   chatHistory: {type: Array, default: () => []},
-  currentSessionId: {type: String, default: ''}
+  currentSessionId: {type: String, default: ''},
+  collapsed: {type: Boolean, default: false}
 })
 
-defineEmits(['new-chat', 'switch-session', 'delete-session'])
+const emit = defineEmits(['new-chat', 'switch-session', 'delete-session', 'update:collapsed'])
 
-const collapsed = ref(false)
+const showLogoutModal = ref(false)
+const isMobile = ref(false)
+
+// 计算collapsed状态
+const collapsed = computed({
+  get: () => props.collapsed,
+  set: (value) => emit('update:collapsed', value)
+})
+
+// 检测是否为移动端
+function checkMobile() {
+  isMobile.value = window.innerWidth < 768
+  if (isMobile.value) {
+    emit('update:collapsed', true)
+  }
+}
+
+onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+})
+
+function handleLogout() {
+  showLogoutModal.value = true
+}
+
+function confirmLogout() {
+  logout()
+}
+
+function handleNewChat() {
+  emit('new-chat')
+  if (isMobile.value) {
+    collapsed.value = true
+  }
+}
+
+function handleSwitchSession(id) {
+  emit('switch-session', id)
+  if (isMobile.value) {
+    collapsed.value = true
+  }
+}
 
 function formatTime(timestamp) {
   if (!timestamp) return ''
@@ -112,6 +182,17 @@ function formatTime(timestamp) {
 </script>
 
 <style scoped>
+/* 移动端遮罩层 */
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+}
+
 .sidebar {
   width: 260px;
   min-width: 260px;
@@ -119,8 +200,8 @@ function formatTime(timestamp) {
   display: flex;
   flex-direction: column;
   background: var(--sidebar-bg);
-  border-right: 1px solid var(--border-color);
-  transition: width 0.25s ease, min-width 0.25s ease;
+  border-right: 1px solid var(--sidebar-border);
+  transition: width 0.25s ease, min-width 0.25s ease, transform 0.25s ease;
   overflow: hidden;
 }
 
@@ -133,6 +214,24 @@ function formatTime(timestamp) {
   margin: 0 auto;
 }
 
+/* 移动端样式 */
+.sidebar.mobile {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: 280px;
+  min-width: 280px;
+  transform: translateX(0);
+}
+
+.sidebar.mobile.collapsed {
+  width: 0;
+  min-width: 0;
+  transform: translateX(-100%);
+  border-right: none;
+}
+
 /* Header */
 .sidebar-header {
   display: flex;
@@ -140,7 +239,7 @@ function formatTime(timestamp) {
   justify-content: space-between;
   height: 56px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--sidebar-border);
   flex-shrink: 0;
 }
 
@@ -178,7 +277,7 @@ function formatTime(timestamp) {
 }
 
 .btn-toggle:hover {
-  background: var(--hover-bg);
+  background: var(--sidebar-hover);
   color: var(--text-primary);
 }
 
@@ -186,7 +285,7 @@ function formatTime(timestamp) {
 .btn-new-chat {
   margin: 12px 16px;
   padding: 10px 16px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--sidebar-border);
   border-radius: 10px;
   background: transparent;
   color: var(--text-primary);
@@ -208,8 +307,8 @@ function formatTime(timestamp) {
 }
 
 .btn-new-chat:hover {
-  background: var(--hover-bg);
-  border-color: var(--accent-color);
+  background: var(--sidebar-hover);
+  border-color: var(--text-muted);
 }
 
 /* Nav */
@@ -227,7 +326,7 @@ function formatTime(timestamp) {
   padding: 10px 12px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--sidebar-text-muted);
   font-size: 14px;
   cursor: pointer;
   font-family: inherit;
@@ -238,8 +337,8 @@ function formatTime(timestamp) {
 }
 
 .nav-item:hover {
-  background: var(--hover-bg);
-  color: var(--text-primary);
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text);
 }
 
 /* History */
@@ -254,7 +353,7 @@ function formatTime(timestamp) {
 .history-label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--sidebar-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 8px 12px 4px;
@@ -272,7 +371,7 @@ function formatTime(timestamp) {
   padding: 10px 12px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--sidebar-text-muted);
   font-size: 13px;
   cursor: pointer;
   font-family: inherit;
@@ -285,13 +384,13 @@ function formatTime(timestamp) {
 }
 
 .history-item:hover {
-  background: var(--hover-bg);
-  color: var(--text-primary);
+  background: var(--sidebar-session-hover);
+  color: var(--sidebar-text);
 }
 
 .history-item.active {
-  background: var(--active-bg);
-  color: var(--text-primary);
+  background: var(--sidebar-session-active);
+  color: var(--sidebar-text);
 }
 
 .history-title {
@@ -335,8 +434,8 @@ function formatTime(timestamp) {
 }
 
 .btn-delete:hover {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-primary);
 }
 
 .history-empty {
@@ -349,7 +448,7 @@ function formatTime(timestamp) {
 /* Footer */
 .sidebar-footer {
   padding: 12px 16px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--sidebar-border);
 }
 
 .user-card {
@@ -363,15 +462,15 @@ function formatTime(timestamp) {
 }
 
 .user-card:hover {
-  background: var(--hover-bg);
+  background: var(--sidebar-hover);
 }
 
 .user-avatar {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #059669, #10b981);
-  color: white;
+  background: var(--text-primary);
+  color: var(--bg-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -402,5 +501,25 @@ function formatTime(timestamp) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.btn-logout {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.btn-logout:hover {
+  background: var(--sidebar-hover);
+  color: #e74c3c;
 }
 </style>

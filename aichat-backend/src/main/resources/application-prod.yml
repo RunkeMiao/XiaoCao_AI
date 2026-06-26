@@ -1,0 +1,107 @@
+# ============================================
+# 生产环境配置
+# ============================================
+# 使用方法：打包时指定 profile
+# java -jar aichat-backend.jar --spring.profiles.active=prod
+
+spring:
+  application:
+    name: aichat-backend
+
+  # AI 配置
+  ai:
+    openai:
+      base-url: https://api.siliconflow.cn
+      api-key: ${AI_API_KEY:sk-xxx}  # 通过环境变量注入
+      chat:
+        model: zai-org/GLM-5.2
+        temperature: 0.7
+
+  # 数据源配置
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:xiaocao_aichat}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: ${DB_USER:root}
+    password: ${DB_PASS:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+
+  # JPA 配置（生产环境）
+  jpa:
+    hibernate:
+      ddl-auto: update  # 首次部署用 update，之后改为 none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  # Redis 配置
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASS:}
+      database: 0
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+
+  # 邮件配置
+  mail:
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USER:}
+    password: ${MAIL_PASS:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+# 股票 API
+biying:
+  base-url: https://api.biyingapi.com
+  licence: ${BIYING_LICENCE:}
+
+# JWT 配置
+jwt:
+  secret: ${JWT_SECRET:mSEPfLSEBPL8vVK17hFC+K8j4HPtOqBjrr+DpbB3rn8=}
+  access-expiration: 3600000
+  refresh-expiration: 604800000
+
+# 服务器配置
+server:
+  port: ${SERVER_PORT:8080}
+  tomcat:
+    max-threads: 200
+    accept-count: 100
+
+# 应用配置
+app:
+  debug:
+    enabled: false
+  cors:
+    allowed-origins: ${CORS_ORIGINS:https://your-domain.com}
+  cookie:
+    secure: ${COOKIE_SECURE:true}
+  chat-memory:
+    pool-size: 4
+    max-messages: 6
+    compress-threshold: 4
+    keep-recent-messages: 2
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    top.xiaocaohub.aichat: INFO
+  file:
+    name: logs/aichat-backend.log
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30

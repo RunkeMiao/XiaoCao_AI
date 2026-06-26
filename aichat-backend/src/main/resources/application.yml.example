@@ -3,7 +3,7 @@
 # ============================================
 # 使用方法：
 # 1. 复制本文件为 application.yml
-# 2. 替换下面的环境变量默认值，或设置系统环境变量
+# 2. 替换下面的占位值为真实配置
 # 3. 不要将包含真实密钥的 application.yml 提交到 Git
 
 spring:
@@ -14,35 +14,108 @@ spring:
   ai:
     openai:
       # AI API 地址
-      base-url: ${AI_BASE_URL:https://api.siliconflow.cn}
+      base-url: https://api.siliconflow.cn
       # AI API 密钥（必填）
-      api-key: ${AI_API_KEY:sk-xxx_replace_with_real_key}
+      api-key: sk-xxx_replace_with_real_key
       chat:
         # 模型名称
-        model: ${AI_MODEL:zai-org/GLM-5.2}
+        model: zai-org/GLM-5.2
         # 温度参数（0-1，越大越随机）
-        temperature: ${AI_TEMPERATURE:0.7}
+        temperature: 0.7
+
+  # 数据源配置
+  datasource:
+    # JDBC 连接地址（请替换数据库名和地址）
+    url: jdbc:mysql://localhost:3306/xiaocao_aichat?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    # 数据库用户名
+    username: root
+    # 数据库密码
+    password: your_password_here
+    # JDBC 驱动
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # JPA 配置
+  jpa:
+    hibernate:
+      # 自动建表策略：update=增量更新, create=每次重建, none=不自动
+      ddl-auto: update
+    # 打印 SQL（生产环境建议关闭）
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: false
 
   # Redis 配置
   data:
     redis:
       # Redis 主机地址
-      host: ${REDIS_HOST:localhost}
+      host: localhost
       # Redis 端口
-      port: ${REDIS_PORT:6379}
-      # Redis 密码（如果没有密码，设为空字符串）
-      password: ${REDIS_PASSWORD:your_password_here}
+      port: 6379
+      # Redis 密码（如果没有密码，设为空）
+      password:
       # Redis 数据库编号
-      database: ${REDIS_DATABASE:0}
+      database: 0
+
+  # 邮件配置（用于发送验证码）
+  mail:
+    # SMTP 服务器地址
+    host: smtp.qq.com
+    # SMTP 端口（587=STARTTLS, 465=SSL）
+    port: 587
+    # 发件人邮箱
+    username: your_email@qq.com
+    # 邮箱授权码（非登录密码）
+    password: your_email_authorization_code
+    properties:
+      mail:
+        smtp:
+          # 启用 SMTP 认证
+          auth: true
+          starttls:
+            # 启用 STARTTLS
+            enable: true
 
 # 必应股票 API 配置
 biying:
   # API 基础地址
-  base-url: ${BIYING_BASE_URL:https://api.biyingapi.com}
+  base-url: https://api.biyingapi.com
   # API 许可证密钥（必填）
-  licence: ${BIYING_LICENCE:your_licence_here}
+  licence: your_licence_here
+
+# JWT 配置
+jwt:
+  # 签名密钥（生产环境务必替换为随机长字符串，至少 32 字节）
+  secret: your-jwt-secret-key-at-least-32-bytes-long!!
+  # Access Token 有效期（毫秒，默认 1 小时）
+  access-expiration: 3600000
+  # Refresh Token 有效期（毫秒，默认 7 天）
+  refresh-expiration: 604800000
 
 # 服务器配置
 server:
   # 服务端口
-  port: ${SERVER_PORT:8080}
+  port: 8080
+
+# 应用自定义配置
+app:
+  # Debug 端点开关（生产环境务必设为 false）
+  debug:
+    enabled: false
+  # CORS 允许的前端域名（逗号分隔）
+  cors:
+    allowed-origins: http://localhost:5173
+  # Cookie 配置
+  cookie:
+    # 生产环境务必设为 true（需要 HTTPS）
+    secure: false
+  # 聊天记忆配置
+  chat-memory:
+    # 异步保存线程池大小
+    pool-size: 4
+    # Redis 最大消息数
+    max-messages: 6
+    # 压缩触发阈值
+    compress-threshold: 4
+    # 压缩时保留的消息数
+    keep-recent-messages: 2

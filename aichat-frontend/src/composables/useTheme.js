@@ -1,78 +1,45 @@
 // src/composables/useTheme.js
-import {ref, watch, onMounted, onUnmounted} from 'vue'
+// 主题管理：始终跟随系统主题，手动切换为临时覆盖
+// 系统主题变化时自动切换，手动切换仅在当前会话有效
+import {ref, watch} from 'vue'
 
 // 检测系统主题偏好
 function getSystemTheme() {
-    if (typeof window === 'undefined') return true // 默认值：深色
+    if (typeof window === 'undefined') return false
     return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
-// 初始化主题：优先使用系统偏好
-function initTheme() {
-    return getSystemTheme()
+// 初始化：始终使用系统主题
+const isDark = ref(getSystemTheme())
+
+// 立即同步到 DOM
+function applyTheme(dark) {
+    if (typeof document !== 'undefined') {
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+    }
 }
 
-// 初始化
-const initialTheme = initTheme()
-const isDark = ref(initialTheme)
+applyTheme(isDark.value)
 
-// 立即设置初始主题
-if (typeof document !== 'undefined') {
-    document.documentElement.setAttribute('data-theme', initialTheme ? 'dark' : 'light')
-}
-
-// 监听系统主题变化（始终跟随系统）
-let mediaQuery = null
-let mediaQueryCleanup = null
-
-function setupSystemThemeListener() {
-    if (typeof window === 'undefined') return
-    
-    mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    
-    console.log('[Theme] 系统主题监听已设置，当前系统主题:', mediaQuery.matches ? '深色' : '浅色')
-    
-    // 监听系统主题变化 - 始终跟随系统
-    const handleChange = (e) => {
-        console.log('[Theme] 检测到系统主题变化，更新为:', e.matches ? '深色' : '浅色')
+// 系统主题变化监听（始终生效）
+if (typeof window !== 'undefined') {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const systemChangeHandler = (e) => {
         isDark.value = e.matches
     }
-    
-    mediaQuery.addEventListener('change', handleChange)
-    
-    // 返回清理函数
-    return () => {
-        mediaQuery.removeEventListener('change', handleChange)
-    }
+    mediaQuery.addEventListener('change', systemChangeHandler)
 }
 
-// 切换主题（临时覆盖，系统主题变化时会自动更新）
+// 手动切换主题（临时覆盖，系统主题变化时会自动覆盖回来）
 function toggleTheme() {
     isDark.value = !isDark.value
 }
 
-// 监听主题变化
+// 监听 isDark 变化，同步到 DOM
 watch(isDark, (val) => {
-    // 设置 HTML 属性
-    document.documentElement.setAttribute('data-theme', val ? 'dark' : 'light')
-    
-    console.log('[Theme] 主题已更新:', val ? '深色' : '浅色')
+    applyTheme(val)
 })
 
-// 导出组合式函数
 export function useTheme() {
-    onMounted(() => {
-        // 组件挂载时，设置系统主题监听
-        mediaQueryCleanup = setupSystemThemeListener()
-        
-        // 组件卸载时，清理监听
-        onUnmounted(() => {
-            if (mediaQueryCleanup) {
-                mediaQueryCleanup()
-                mediaQueryCleanup = null
-            }
-        })
-    })
-    
     return {isDark, toggleTheme}
 }

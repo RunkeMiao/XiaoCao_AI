@@ -1,0 +1,194 @@
+/* ===== 全局主题变量 ===== */
+
+/* 浅色模式（默认） */
+:root,
+[data-theme="light"] {
+  /* 背景 */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-sidebar: #f9f9f9;
+
+  /* 文字 */
+  --text-primary: #1a1a1a;
+  --text-secondary: #444;
+  --text-muted: #888;
+
+  /* 边框 */
+  --border-color: #e5e5e5;
+
+  /* 输入框 */
+  --input-bg: #fff;
+
+  /* 悬停 */
+  --hover-bg: rgba(0, 0, 0, 0.05);
+
+  /* 滚动条 */
+  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+
+  /* 强调色（聚焦边框等） */
+  --accent-color: #111;
+
+  /* 主按钮 */
+  --btn-primary-bg: #111;
+  --btn-primary-text: #fff;
+
+  /* 消息气泡 */
+  --bubble-ai-bg: transparent;
+  --bubble-user-bg: #111;
+  --bubble-user-text: #fff;
+
+  /* 代码 */
+  --inline-code-bg: rgba(0, 0, 0, 0.06);
+  --inline-code-color: #d73a49;
+  --code-block-bg: #f6f8fa;
+  --code-block-border: #e5e5e5;
+  --code-block-color: #24292e;
+
+  /* 表格 */
+  --table-head-bg: #444;
+  --table-head-text: #fff;
+  --table-row-even: rgba(0, 0, 0, 0.03);
+  --table-border: #e5e5e5;
+
+  /* 链接 */
+  --link-color: #111;
+
+  /* 引用块 */
+  --blockquote-border: #999;
+
+  /* 侧边栏 */
+  --sidebar-bg: #f9f9f9;
+  --sidebar-border: #e5e5e5;
+  --sidebar-hover: rgba(0, 0, 0, 0.06);
+  --sidebar-active: rgba(0, 0, 0, 0.09);
+  --sidebar-text: #333;
+  --sidebar-text-muted: #888;
+  --sidebar-session-hover: rgba(0, 0, 0, 0.04);
+  --sidebar-session-active: rgba(0, 0, 0, 0.07);
+
+  /* highlight.js  token 颜色（浅色模式） */
+  --hljs-keyword: #d73a49;
+  --hljs-string: #032f62;
+  --hljs-comment: #6a737d;
+  --hljs-number: #005cc5;
+  --hljs-builtin: #005cc5;
+  --hljs-title: #6f42c1;
+  --hljs-params: #24292e;
+  --hljs-attr: #005cc5;
+  --hljs-type: #d73a49;
+
+  /* 登录页插图装饰色（浅色） */
+  --deco-base: #d0d5dd;
+  --deco-base-light: #e8ebf0;
+  --deco-card: #fff;
+  --deco-card-light: #f0f1f5;
+  --deco-dot-dark: #333;
+  --deco-dot-mid: #999;
+  --deco-dot-light: #ccc;
+  --deco-line: #999;
+  --deco-line-light: #ccc;
+  --deco-float-1: #bbb;
+  --deco-float-1-light: #ddd;
+  --deco-float-2: #ccc;
+  --deco-float-2-light: #e5e5e5;
+  --deco-float-3: #aaa;
+  --deco-float-3-light: #ccc;
+  --deco-float-4: #d0d0d0;
+  --deco-float-5: #c0c0c0;
+}
+
+/* 深色模式 */
+[data-theme="dark"] {
+  /* 背景 */
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-sidebar: #0d1117;
+
+  /* 文字 */
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #484f58;
+
+  /* 边框 */
+  --border-color: #30363d;
+
+  /* 输入框 */
+  --input-bg: #161b22;
+
+  /* 悬停 */
+  --hover-bg: rgba(255, 255, 255, 0.05);
+
+  /* 滚动条 */
+  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+
+  /* 强调色（聚焦边框等） */
+  --accent-color: #e6edf3;
+
+  /* 主按钮 */
+  --btn-primary-bg: #e6edf3;
+  --btn-primary-text: #0d1117;
+
+  /* 消息气泡 */
+  --bubble-ai-bg: transparent;
+  --bubble-user-bg: #e6edf3;
+  --bubble-user-text: #0d1117;
+
+  /* 代码 */
+  --inline-code-bg: rgba(255, 255, 255, 0.08);
+  --inline-code-color: #ff7b72;
+  --code-block-bg: #161b22;
+  --code-block-border: #30363d;
+  --code-block-color: #e6edf3;
+
+  /* 表格 */
+  --table-head-bg: #21262d;
+  --table-head-text: #e6edf3;
+  --table-row-even: rgba(255, 255, 255, 0.03);
+  --table-border: #30363d;
+
+  /* 链接 */
+  --link-color: #e6edf3;
+
+  /* 引用块 */
+  --blockquote-border: #484f58;
+
+  /* 侧边栏 */
+  --sidebar-bg: #0d1117;
+  --sidebar-border: #21262d;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-active: rgba(255, 255, 255, 0.09);
+  --sidebar-text: #e6edf3;
+  --sidebar-text-muted: #8b949e;
+  --sidebar-session-hover: rgba(255, 255, 255, 0.04);
+  --sidebar-session-active: rgba(255, 255, 255, 0.08);
+
+  /* highlight.js token 颜色（深色模式） */
+  --hljs-keyword: #ff7b72;
+  --hljs-string: #a5d6ff;
+  --hljs-comment: #8b949e;
+  --hljs-number: #79c0ff;
+  --hljs-builtin: #79c0ff;
+  --hljs-title: #d2a8ff;
+  --hljs-params: #e6edf3;
+  --hljs-attr: #79c0ff;
+  --hljs-type: #ff7b72;
+
+  /* 登录页插图装饰色（深色） */
+  --deco-base: #21262d;
+  --deco-base-light: #30363d;
+  --deco-card: #161b22;
+  --deco-card-light: #1c2128;
+  --deco-dot-dark: #8b949e;
+  --deco-dot-mid: #484f58;
+  --deco-dot-light: #30363d;
+  --deco-line: #484f58;
+  --deco-line-light: #30363d;
+  --deco-float-1: #30363d;
+  --deco-float-1-light: #21262d;
+  --deco-float-2: #30363d;
+  --deco-float-2-light: #21262d;
+  --deco-float-3: #30363d;
+  --deco-float-3-light: #21262d;
+  --deco-float-4: #30363d;
+  --deco-float-5: #21262d;
+}
