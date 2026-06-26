@@ -78,3 +78,52 @@ export function post(url, data) {
     body: JSON.stringify(data),
   })
 }
+
+export function put(url, data) {
+  return request(url, {
+    method: 'PUT',
+    body: data ? JSON.stringify(data) : undefined,
+  })
+}
+
+export function del(url) {
+  return request(url, { method: 'DELETE' })
+}
+
+// 聊天会话相关API
+export const chatApi = {
+  // 创建新会话
+  createSession() {
+    return post('/api/sessions')
+  },
+
+  // 获取用户的所有会话
+  getSessions() {
+    return get('/api/sessions')
+  },
+
+  // 获取会话详情
+  getSession(sessionId) {
+    return get(`/api/sessions/${sessionId}`)
+  },
+
+  // 更新会话标题
+  updateSessionTitle(sessionId, title) {
+    return put(`/api/sessions/${sessionId}?title=${encodeURIComponent(title)}`)
+  },
+
+  // 删除会话
+  deleteSession(sessionId) {
+    return del(`/api/sessions/${sessionId}`)
+  },
+
+  // 获取会话消息
+  getSessionMessages(sessionId) {
+    return get(`/api/sessions/${sessionId}/messages`)
+  },
+
+  // 保存消息
+  saveMessage(sessionId, role, content) {
+    return post(`/api/sessions/${sessionId}/messages`, { role, content })
+  }
+}

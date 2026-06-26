@@ -1,115 +1,194 @@
-import {ref, nextTick, watch} from 'vue'
-import {post} from '../utils/request.js'
+import {ref, nextTick} from 'vue'
+import {post, chatApi} from '../utils/request.js'
 
 export function useChat() {
     const messages = ref([])
     const isStreaming = ref(false)
     const sessionId = ref('')
-    // 当前请求的 AbortController（用于终止请求）
+    const chatHistory = ref([])
     let abortController = null
-    // 当前 reader（用于终止流式读取）
     let currentReader = null
-    // 对话历史列表
-    const chatHistory = ref(JSON.parse(localStorage.getItem('chat-history') || '[]'))
 
-    function initSession() {
-        let id = localStorage.getItem('chat-session-id')
-        if (!id) {
-            id = 's_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8)
-            localStorage.setItem('chat-session-id', id)
+    /**
+     * 初始化：从服务器加载会话列表
+     */
+    async function initSessions() {
+        try {
+            const response = await chatApi.getSessions()
+            if (response.ok) {
+                const data = await response.json()
+                chatHistory.value = data.map(session => ({
+                    id: session.sessionId,
+                    title: session.title,
+                    titleEdited: session.titleEdited,
+                    time: new Date(session.updatedAt).toLocaleString('zh-CN', {
+                        month: 'numeric',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }),
+                    updatedAt: new Date(session.updatedAt).getTime()
+                }))
+            }
+        } catch (e) {
+            console.error('加载会话列表失败:', e)
         }
-        sessionId.value = id
-        loadHistoryMessages(id)
+
+        // 默认显示欢迎界面
+        sessionId.value = ''
+        messages.value = []
     }
 
-    function loadHistoryMessages(id) {
-        const stored = localStorage.getItem('chat-messages-' + id)
-        if (stored) {
-            messages.value = JSON.parse(stored)
-        } else {
+    /**
+     * 加载会话消息
+     */
+    async function loadSessionMessages(id) {
+        try {
+            const response = await chatApi.getSessionMessages(id)
+            if (response.ok) {
+                const data = await response.json()
+                messages.value = data.map(msg => ({
+                    role: msg.role === 'assistant' ? 'ai' : msg.role,
+                    content: msg.content
+                }))
+            } else {
+                messages.value = []
+            }
+        } catch (e) {
+            console.error('加载消息失败:', e)
             messages.value = []
         }
     }
 
-    function saveCurrentMessages() {
-        if (sessionId.value) {
-            localStorage.setItem('chat-messages-' + sessionId.value, JSON.stringify(messages.value))
-        }
-    }
+    /**
+     * 切换会话
+     */
+    async function switchSession(id) {
+        if (isStreaming.value) return
 
-    function addChatHistory(title) {
-        const exists = chatHistory.value.find(h => h.id === sessionId.value)
-        if (!exists) {
-            chatHistory.value.unshift({
-                id: sessionId.value,
-                title: title || '新对话',
-                time: new Date().toLocaleString('zh-CN', {
-                    month: 'numeric',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                }),
-                updatedAt: Date.now()
-            })
-            // 只保留最近 20 条
-            if (chatHistory.value.length > 20) chatHistory.value.pop()
-            persistHistory()
-        }
-    }
-
-    function updateChatHistoryTitle(title) {
-        const item = chatHistory.value.find(h => h.id === sessionId.value)
-        if (item && !item.titleEdited) {
-            item.title = title
-            item.titleEdited = true
-            persistHistory()
-        }
-    }
-
-    function persistHistory() {
-        localStorage.setItem('chat-history', JSON.stringify(chatHistory.value))
-    }
-
-    function switchSession(id) {
-        saveCurrentMessages()
+        console.log('切换会话 - id:', id)
         sessionId.value = id
-        localStorage.setItem('chat-session-id', id)
-        loadHistoryMessages(id)
+        console.log('切换会话后 - sessionId.value:', sessionId.value)
+        await loadSessionMessages(id)
     }
 
-    function deleteSession(id) {
-        chatHistory.value = chatHistory.value.filter(h => h.id !== id)
-        localStorage.removeItem('chat-messages-' + id)
-        persistHistory()
-        if (sessionId.value === id) {
-            newSession()
-        }
-    }
-
+    /**
+     * 新建对话（点击按钮）- 只跳转到欢迎界面，不创建会话
+     */
     function newSession() {
-        saveCurrentMessages()
-        sessionId.value = 's_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8)
-        localStorage.setItem('chat-session-id', sessionId.value)
+        if (isStreaming.value) return
+
+        // 清空当前状态，显示欢迎页面
+        sessionId.value = ''
         messages.value = []
     }
 
+    /**
+     * 创建新会话（内部方法，发送消息时调用）
+     */
+    async function createNewSession() {
+        try {
+            console.log('调用createSession API')
+            const response = await chatApi.createSession()
+            if (response.ok) {
+                const data = await response.json()
+                console.log('createSession返回数据:', data)
+                sessionId.value = data.sessionId
+                console.log('设置sessionId.value为:', sessionId.value)
+
+                // 更新历史列表
+                chatHistory.value.unshift({
+                    id: data.sessionId,
+                    title: data.title,
+                    titleEdited: data.titleEdited,
+                    time: new Date(data.createdAt).toLocaleString('zh-CN', {
+                        month: 'numeric',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }),
+                    updatedAt: new Date(data.createdAt).getTime()
+                })
+
+                return data.sessionId
+            }
+        } catch (e) {
+            console.error('创建会话失败:', e)
+        }
+        return null
+    }
+
+    /**
+     * 删除会话
+     */
+    async function deleteSession(id) {
+        try {
+            const response = await chatApi.deleteSession(id)
+            if (response.ok) {
+                chatHistory.value = chatHistory.value.filter(h => h.id !== id)
+
+                if (sessionId.value === id) {
+                    if (chatHistory.value.length > 0) {
+                        await switchSession(chatHistory.value[0].id)
+                    } else {
+                        // 没有会话了，显示空状态
+                        sessionId.value = ''
+                        messages.value = []
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('删除会话失败:', e)
+        }
+    }
+
+    /**
+     * 更新会话标题（用户手动编辑）
+     */
+    async function updateSessionTitle(id, title) {
+        try {
+            const response = await chatApi.updateSessionTitle(id, title)
+            if (response.ok) {
+                // 更新本地历史列表
+                const item = chatHistory.value.find(h => h.id === id)
+                if (item) {
+                    item.title = title
+                    item.titleEdited = true
+                }
+            }
+        } catch (e) {
+            console.error('更新会话标题失败:', e)
+        }
+    }
+
+    /**
+     * 发送消息
+     */
     async function sendMessage(text) {
         if (isStreaming.value || !text.trim()) return
 
-        // 首条消息时添加到历史
-        if (messages.value.length === 0) {
-            addChatHistory(text.substring(0, 30))
-        }
-        updateChatHistoryTitle(text.substring(0, 30))
+        console.log('发送消息前 - sessionId:', sessionId.value)
 
+        // 如果没有当前会话，创建新会话
+        if (!sessionId.value) {
+            console.log('sessionId为空，创建新会话')
+            const sid = await createNewSession()
+            if (!sid) {
+                console.error('无法创建会话')
+                return
+            }
+            console.log('新会话创建成功 - sessionId:', sid)
+        }
+
+        console.log('发送消息 - sessionId:', sessionId.value)
+
+        // 添加用户消息到界面
         messages.value.push({role: 'user', content: text})
         const aiIndex = messages.value.length
         messages.value.push({role: 'ai', content: ''})
         isStreaming.value = true
 
-        // 创建 AbortController 用于终止请求
         abortController = new AbortController()
-
         await nextTick()
 
         try {
@@ -129,11 +208,24 @@ export function useChat() {
 
             while (true) {
                 const {done, value} = await currentReader.read()
-                if (done) break
+                if (done) {
+                    // 流结束，处理buffer中剩余的数据
+                    if (buffer.trim()) {
+                        const dataParts = []
+                        for (const line of buffer.split('\n')) {
+                            if (line.startsWith('data:')) {
+                                dataParts.push(line.slice(5))
+                            }
+                        }
+                        if (dataParts.length > 0) {
+                            messages.value[aiIndex].content += dataParts.join('\n')
+                        }
+                    }
+                    break
+                }
 
                 buffer += decoder.decode(value, {stream: true})
 
-                // SSE 事件以 \n\n 分隔，正确处理包含换行符的内容
                 while (true) {
                     const eventEnd = buffer.indexOf('\n\n')
                     if (eventEnd === -1) break
@@ -141,7 +233,6 @@ export function useChat() {
                     const event = buffer.substring(0, eventEnd)
                     buffer = buffer.substring(eventEnd + 2)
 
-                    // 提取事件中所有 data: 行，用 \n 拼接（SSE 多行 data 规范）
                     const dataParts = []
                     for (const line of event.split('\n')) {
                         if (line.startsWith('data:')) {
@@ -154,28 +245,24 @@ export function useChat() {
                 }
             }
 
-            // 处理缓冲区中剩余的数据
-            if (buffer.trim()) {
-                const dataParts = []
-                for (const line of buffer.split('\n')) {
-                    if (line.startsWith('data:')) {
-                        dataParts.push(line.slice(5))
-                    }
-                }
-                if (dataParts.length > 0) {
-                    messages.value[aiIndex].content += dataParts.join('\n')
+            // 保存AI回复到数据库
+            if (messages.value[aiIndex].content && !messages.value[aiIndex].content.includes('[已停止生成]')) {
+                try {
+                    await chatApi.saveMessage(sessionId.value, 'assistant', messages.value[aiIndex].content)
+                } catch (e) {
+                    console.error('保存AI回复失败:', e)
                 }
             }
 
-            // 保存消息到本地存储
-            saveCurrentMessages()
+            // 第一轮对话后，自动生成标题
+            if (messages.value.length === 2) {
+                generateSmartTitle()
+            }
 
         } catch (e) {
-            // 如果是用户主动终止，不显示错误
             if (e.name === 'AbortError') {
                 messages.value[aiIndex].content += '\n\n[已停止生成]'
             } else if (messages.value[aiIndex].content) {
-                // 已有内容，说明数据已收到，流异常结束，不覆盖
                 messages.value[aiIndex].content += '\n\n[生成结束]'
             } else {
                 messages.value[aiIndex].content = '请求出错: ' + e.message
@@ -187,7 +274,43 @@ export function useChat() {
         }
     }
 
-    // 停止 AI 生成
+    /**
+     * 智能生成会话标题
+     */
+    async function generateSmartTitle() {
+        try {
+            // 取前4条消息作为上下文
+            const contextMessages = messages.value.slice(0, 4)
+            const context = contextMessages.map(m =>
+                `${m.role === 'user' ? '用户' : 'AI'}: ${m.content.substring(0, 200)}`
+            ).join('\n')
+
+            // 调用AI生成标题（通过后端API）
+            const resp = await post('/api/sessions/' + sessionId.value + '/generate-title', {context})
+            if (resp.ok) {
+                const data = await resp.json()
+                const title = data.title
+
+                // 更新本地历史列表
+                const item = chatHistory.value.find(h => h.id === sessionId.value)
+                if (item && !item.titleEdited) {
+                    item.title = title
+                }
+            }
+        } catch (e) {
+            console.error('生成标题失败:', e)
+            // 降级策略：使用用户第一条消息的前10个字符
+            const fallbackTitle = messages.value[0]?.content?.substring(0, 10) || '新对话'
+            const item = chatHistory.value.find(h => h.id === sessionId.value)
+            if (item && !item.titleEdited) {
+                item.title = fallbackTitle
+            }
+        }
+    }
+
+    /**
+     * 停止生成
+     */
     function stopGeneration() {
         if (abortController) {
             abortController.abort()
@@ -197,12 +320,19 @@ export function useChat() {
         }
     }
 
-    // 页面关闭前保存
-    if (typeof window !== 'undefined') {
-        window.addEventListener('beforeunload', saveCurrentMessages)
+    // 初始化
+    initSessions()
+
+    return {
+        messages,
+        isStreaming,
+        sessionId,
+        chatHistory,
+        sendMessage,
+        stopGeneration,
+        newSession,
+        switchSession,
+        deleteSession,
+        updateSessionTitle
     }
-
-    initSession()
-
-    return {messages, isStreaming, sessionId, chatHistory, sendMessage, stopGeneration, newSession, switchSession, deleteSession}
 }
