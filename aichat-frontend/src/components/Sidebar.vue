@@ -1,5 +1,15 @@
 <template>
   <aside class="sidebar" :class="{ collapsed }">
+    <!-- 退出登录确认弹窗 -->
+    <ConfirmModal
+      v-model:visible="showLogoutModal"
+      title="退出登录"
+      message="确定要退出当前账号吗？退出后需要重新登录才能使用。"
+      confirm-text="退出"
+      cancel-text="取消"
+      type="warning"
+      @confirm="confirmLogout"
+    />
     <!-- Logo 区域 -->
     <div class="sidebar-header" :class="{ collapsed }">
       <div class="logo" v-show="!collapsed">
@@ -94,6 +104,7 @@
 <script setup>
 import {ref} from 'vue'
 import {useAuth} from '../composables/useAuth.js'
+import ConfirmModal from './ConfirmModal.vue'
 
 const {username, logout} = useAuth()
 
@@ -105,11 +116,14 @@ defineProps({
 defineEmits(['new-chat', 'switch-session', 'delete-session'])
 
 const collapsed = ref(false)
+const showLogoutModal = ref(false)
 
 function handleLogout() {
-  if (confirm('确定退出登录？')) {
-    logout()
-  }
+  showLogoutModal.value = true
+}
+
+function confirmLogout() {
+  logout()
 }
 
 function formatTime(timestamp) {
