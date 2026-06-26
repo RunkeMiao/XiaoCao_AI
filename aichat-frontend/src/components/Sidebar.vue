@@ -88,9 +88,9 @@
     <!-- 底部用户信息 -->
     <div class="sidebar-footer" v-show="!collapsed">
       <div class="user-card">
-        <div class="user-avatar">{{ username ? username.charAt(0).toUpperCase() : 'U' }}</div>
+        <div class="user-avatar">{{ displayName ? displayName.charAt(0).toUpperCase() : 'U' }}</div>
         <div class="user-info">
-          <span class="user-name">{{ username || '未登录' }}</span>
+          <span class="user-name">{{ displayName || '未登录' }}</span>
         </div>
         <button class="btn-logout" @click="handleLogout" title="退出登录">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -109,7 +109,10 @@ import {ref, computed, onMounted, onUnmounted} from 'vue'
 import {useAuth} from '../composables/useAuth.js'
 import ConfirmModal from './ConfirmModal.vue'
 
-const {username, logout} = useAuth()
+const {username, realName, logout} = useAuth()
+
+// 优先显示真实姓名，否则显示用户名
+const displayName = computed(() => realName.value || username.value)
 
 const props = defineProps({
   chatHistory: {type: Array, default: () => []},

@@ -230,20 +230,6 @@ export function useChat() {
                 }
             }
 
-            // 保存AI回复到数据库
-            if (messages.value[aiIndex].content && !messages.value[aiIndex].content.includes('[已停止生成]')) {
-                try {
-                    await chatApi.saveMessage(sessionId.value, 'assistant', messages.value[aiIndex].content)
-                } catch (e) {
-                    console.error('保存AI回复失败:', e)
-                }
-            }
-
-            // 第一轮对话后，自动生成标题
-            if (messages.value.length === 2) {
-                await generateSmartTitle()
-            }
-
         } catch (e) {
             if (e.name === 'AbortError') {
                 messages.value[aiIndex].content += '\n\n[已停止生成]'
@@ -257,10 +243,22 @@ export function useChat() {
             abortController = null
             currentReader = null
         }
+
+        // AI回复已由后端保存到数据库，前端只需生成标题
+        if (messages.value.length === 2) {
+            // 先设置临时标题，让用户立即看到
+            const tempTitle = text.substring(0, 10) || '新对话'
+            const item = chatHistory.value.find(h => h.id === sessionId.value)
+            if (item && !item.titleEdited) {
+                item.title = tempTitle
+            }
+            // 异步生成AI标题
+            generateSmartTitle()
+        }
     }
 
     /**
-     * 智能生成会话标题
+     * 智能生成会话标题（异步，不阻塞用户）
      */
     async function generateSmartTitle() {
         try {
@@ -284,12 +282,7 @@ export function useChat() {
             }
         } catch (e) {
             console.error('生成标题失败:', e)
-            // 降级策略：使用用户第一条消息的前10个字符
-            const fallbackTitle = messages.value[0]?.content?.substring(0, 10) || '新对话'
-            const item = chatHistory.value.find(h => h.id === sessionId.value)
-            if (item && !item.titleEdited) {
-                item.title = fallbackTitle
-            }
+            // 降级策略已在sendMessage中设置临时标题，无需额外处理
         }
     }
 

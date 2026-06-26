@@ -291,7 +291,7 @@ async function handleRegister() {
     })
     const data = await res.json()
     if (data.code === 200) {
-      setLogin(form.value.username)
+      setLogin(form.value.username, form.value.realName)
       successMsg.value = '注册成功，即将跳转...'
       setTimeout(() => router.push('/'), 1500)
     } else {

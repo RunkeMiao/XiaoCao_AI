@@ -2,6 +2,7 @@ import {ref} from 'vue'
 import {get, post} from '../utils/request.js'
 
 const username = ref('')
+const realName = ref('')
 const isLoggedIn = ref(false)
 const checked = ref(false)
 
@@ -18,21 +19,25 @@ export function useAuth() {
       if (data.code === 200) {
         isLoggedIn.value = true
         username.value = data.username || ''
+        realName.value = data.realName || ''
       } else {
         isLoggedIn.value = false
         username.value = ''
+        realName.value = ''
       }
     } catch {
       isLoggedIn.value = false
       username.value = ''
+      realName.value = ''
     }
     checked.value = true
     return isLoggedIn.value
   }
 
-  function setLogin(newUsername) {
+  function setLogin(newUsername, newRealName) {
     isLoggedIn.value = true
     username.value = newUsername || ''
+    realName.value = newRealName || ''
     checked.value = true
   }
 
@@ -48,6 +53,7 @@ export function useAuth() {
     console.log('Clearing local state...')
     isLoggedIn.value = false
     username.value = ''
+    realName.value = ''
     checked.value = false
     console.log('Redirecting to /login...')
     window.location.href = '/login'
@@ -55,6 +61,7 @@ export function useAuth() {
 
   return {
     username,
+    realName,
     isLoggedIn,
     checked,
     checkLogin,

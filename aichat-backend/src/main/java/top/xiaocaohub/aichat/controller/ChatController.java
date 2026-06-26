@@ -16,8 +16,11 @@ import reactor.core.publisher.Flux;
 import top.xiaocaohub.aichat.dto.ChatMessageResponse;
 import top.xiaocaohub.aichat.dto.ChatRequest;
 import top.xiaocaohub.aichat.dto.ChatSessionResponse;
+import top.xiaocaohub.aichat.dto.PageResponse;
 import top.xiaocaohub.aichat.dto.SaveMessageRequest;
+import top.xiaocaohub.aichat.exception.BusinessException;
 import top.xiaocaohub.aichat.service.ChatService;
+import top.xiaocaohub.aichat.util.InputSanitizer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,76 +32,133 @@ import java.util.Set;
 @RequestMapping("/api")
 public class ChatController {
 
+    private static final String SYSTEM_PROMPT = """
+            # 角色
+            你是一个专业、友好的 AI 助手，擅长清晰地解答问题和分析数据。
+
+            # 输出规范（Markdown）
+            - 标题独占一行，前后空行；段落间用空行分隔。
+            - 列表项之间空行分隔，提升可读性。
+            - 表格直接用 Markdown 语法，不要包裹在代码块中。
+            - 仅代码示例使用 ``` 块并标注语言。
+            - 回答简洁准确，重点突出，避免冗余。
+
+            # 工具调用规则（必须遵守）
+            1. **时间/日期**：用户询问当前时间时，必须调用 getCurrentDateTime，禁止凭记忆回答。
+            2. **股票数据**：涉及股价、行情、K线、涨跌停、公司信息、股东、分红、指数等，必须调用对应工具，严禁编造数据。
+            3. **数据范围**：仅支持 A股（沪深）、北交所、科创板。港股/美股请回复"暂不支持"。
+
+            # 可用工具
+            | 工具 | 用途 | 参数说明 |
+            |------|------|----------|
+            | getStockQuote(stockCode) | 实时行情 | stockCode: 纯数字，如 "000001" |
+            | getStockKline(stockCodeMarket, period, limit) | K线数据 | stockCodeMarket: "000001.SZ"；period: d/w/m；limit: 数字 |
+            | getStockHistoryKline(stockCodeMarket, period, startDate, endDate, limit) | 历史K线 | 同上 + startDate/endDate: "2025-01-15" |
+            | getZtStocks(date) | 涨停股池 | date: "2025-01-15" |
+            | getDtStocks(date) | 跌停股池 | 同上 |
+            | getQsStocks(date) | 强势股池 | 同上 |
+            | getNewStocks() | 新股列表 | 无参数 |
+            | getCompanyInfo(stockCode) | 公司简介 | stockCode: 纯数字 |
+            | getDividendHistory(stockCode) | 历年分红 | 同上 |
+            | getTopShareholders(stockCode) | 十大股东 | 同上 |
+            | getIndexQuote(indexCode) | 指数行情 | indexCode: "000001.SH" 或 "399001.SZ" |
+            """;
+
     private final ChatClient chatClient;
     private final ChatMemory chatMemory;
     private final StringRedisTemplate redis;
     private final ChatService chatService;
+    private final InputSanitizer inputSanitizer;
 
     public ChatController(ChatClient chatClient, ChatMemory chatMemory,
-                         StringRedisTemplate redis, ChatService chatService) {
+                         StringRedisTemplate redis, ChatService chatService,
+                         InputSanitizer inputSanitizer) {
         this.chatClient = chatClient;
         this.chatMemory = chatMemory;
         this.redis = redis;
         this.chatService = chatService;
+        this.inputSanitizer = inputSanitizer;
     }
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> chat(@RequestBody ChatRequest request,
                             @AuthenticationPrincipal Long userId) {
+        // 输入验证
+        InputSanitizer.ValidationResult validation = inputSanitizer.validate(request.message());
+        if (!validation.valid()) {
+            return Flux.error(new BusinessException(validation.message()));
+        }
+
         // 验证会话属于当前用户
         try {
             chatService.getSession(request.sessionId(), userId);
         } catch (RuntimeException e) {
-            return Flux.error(new RuntimeException("会话不存在或无权访问"));
+            return Flux.error(new BusinessException("会话不存在或无权访问"));
         }
 
-        // 保存用户消息到数据库
-        chatService.saveMessage(request.sessionId(), "user", request.message());
+        // 清理并保存用户消息到数据库
+        String sanitizedMessage = inputSanitizer.sanitize(request.message());
+        chatService.saveMessage(request.sessionId(), "user", sanitizedMessage);
 
         // 使用用户ID隔离Redis中的聊天记忆
         String conversationId = userId + ":" + request.sessionId();
+        String sessionId = request.sessionId();
 
         // 为当前请求创建advisor，设置conversationId
         Advisor advisor = MessageChatMemoryAdvisor.builder(chatMemory)
                 .build();
 
+        // 用于收集AI回复的StringBuilder
+        StringBuilder aiResponse = new StringBuilder();
+
+        // 保存AI回复的辅助方法
+        Runnable saveAiResponse = () -> {
+            String response = aiResponse.toString();
+            if (!response.isEmpty() && !response.contains("⚠️")) {
+                try {
+                    chatService.saveMessage(sessionId, "assistant", response);
+                    log.debug("AI回复已保存到数据库: {}", sessionId);
+                } catch (Exception e) {
+                    log.warn("保存AI回复失败: {}", e.getMessage());
+                }
+            }
+        };
+
+        // 流式调用：失败自动重试1次，仍失败则降级为非流式
         return chatClient.prompt()
-                .system("""
-                        你是一个 AI 助手。请严格遵守以下 Markdown 输出规范：
-                        1. 标题（# ## ### 等）必须独占一行，标题前后必须有一个空行。
-                        2. 普通段落之间用一个空行分隔。
-                        3. 列表项之间用一个空行分隔，使排版清晰。
-                        4. 表格直接用 Markdown 表格语法，不要用代码块包裹。
-                        5. 只有代码示例才使用 ``` 代码块，并标注语言。
-                        6. 行内代码、加粗、链接等使用标准 Markdown 语法。
-                        7. 保持回答简洁、准确、结构清晰。
-
-                        【重要规则】
-                        - 当用户询问当前时间、日期时，你必须调用 getCurrentDateTime 工具，不要凭记忆回答。
-                        - 当用户询问任何股票、股价、行情、K线、涨跌停、公司信息、股东、分红、指数相关内容时，你必须调用对应的股票工具，绝对不要凭记忆编造数据。
-                        - 你只能查询A股、北交所、科创板的数据，不支持港股和美股。如果用户问港股或美股，请告知暂不支持。
-
-                        【可用的股票工具及使用方法】
-                        1. getStockQuote(stockCode) - 查实时行情，stockCode传纯数字代码如"000001"、"600519"
-                        2. getStockKline(stockCodeMarket, period, limit) - 查K线，stockCodeMarket传"000001.SZ"或"600519.SH"，period传"d"或"w"或"m"，limit传数字如10
-                        3. getStockHistoryKline(stockCodeMarket, period, startDate, endDate, limit) - 查历史K线
-                        4. getZtStocks(date) - 查涨停股池，date传"2025-01-15"格式
-                        5. getDtStocks(date) - 查跌停股池
-                        6. getQsStocks(date) - 查强势股池
-                        7. getNewStocks() - 查新股列表
-                        8. getCompanyInfo(stockCode) - 查公司简介
-                        9. getDividendHistory(stockCode) - 查历年分红
-                        10. getTopShareholders(stockCode) - 查十大股东
-                        11. getIndexQuote(indexCode) - 查指数行情，indexCode传"000001.SH"或"399001.SZ"
-                        """)
-                .user(request.message())
+                .system(SYSTEM_PROMPT)
+                .user(sanitizedMessage)
                 .advisors(advisor)
                 .advisors(a -> a.param("chat_memory_conversation_id", conversationId))
                 .stream()
                 .content()
+                .retry(1)
+                .doOnNext(chunk -> aiResponse.append(chunk))  // 收集每个chunk
+                .doOnComplete(saveAiResponse::run)  // 正常结束时保存
+                .doOnCancel(() -> {
+                    // 用户取消时保存已生成的部分回复
+                    log.info("用户取消了流式生成，保存部分回复: {}", sessionId);
+                    saveAiResponse.run();
+                })
                 .onErrorResume(e -> {
-                    log.warn("SSE流异常: {}", e.getMessage());
-                    return Flux.empty();
+                    log.warn("流式调用失败(已重试)，降级为非流式: {}", e.getMessage());
+                    try {
+                        String fallback = chatClient.prompt()
+                                .system(SYSTEM_PROMPT)
+                                .user(sanitizedMessage)
+                                .advisors(advisor)
+                                .advisors(a2 -> a2.param("chat_memory_conversation_id", conversationId))
+                                .call()
+                                .content();
+                        // 非流式降级也要保存到数据库
+                        if (fallback != null && !fallback.contains("⚠️")) {
+                            chatService.saveMessage(sessionId, "assistant", fallback);
+                        }
+                        return Flux.just(fallback != null ? fallback : "⚠️ 服务暂时不可用，请稍后重试。");
+                    } catch (Exception ex) {
+                        log.error("非流式降级也失败: {}", ex.getMessage());
+                        return Flux.just("⚠️ 服务暂时不可用，请稍后重试。");
+                    }
                 });
     }
 
@@ -139,6 +199,15 @@ public class ChatController {
         // 重建Redis上下文
         rebuildRedisContext(sessionId, userId);
         return chatService.getSessionMessages(sessionId, userId);
+    }
+
+    @GetMapping("/sessions/{sessionId}/messages/paged")
+    public PageResponse<ChatMessageResponse> getSessionMessagesPaged(
+            @PathVariable String sessionId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal Long userId) {
+        return chatService.getSessionMessagesPaged(sessionId, userId, page, size);
     }
 
     /**

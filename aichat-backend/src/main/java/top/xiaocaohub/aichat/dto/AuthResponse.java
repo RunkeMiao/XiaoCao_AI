@@ -10,6 +10,7 @@ public class AuthResponse {
     private String refreshToken;
     private String username;
     private String email;
+    private String realName;
 
     public AuthResponse(int code, String message) {
         this.code = code;
@@ -23,10 +24,11 @@ public class AuthResponse {
         this.refreshToken = refreshToken;
     }
 
-    public static AuthResponse me(String username, String email) {
+    public static AuthResponse me(String username, String email, String realName) {
         AuthResponse resp = new AuthResponse(200, "ok");
         resp.setUsername(username);
         resp.setEmail(email);
+        resp.setRealName(realName);
         return resp;
     }
 }

@@ -122,6 +122,11 @@ export const chatApi = {
     return get(`/api/sessions/${sessionId}/messages`)
   },
 
+  // 分页获取会话消息
+  getSessionMessagesPaged(sessionId, page = 0, size = 20) {
+    return get(`/api/sessions/${sessionId}/messages/paged?page=${page}&size=${size}`)
+  },
+
   // 保存消息
   saveMessage(sessionId, role, content) {
     return post(`/api/sessions/${sessionId}/messages`, { role, content })

@@ -24,7 +24,7 @@ public class AuthController {
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
 
-    @Value("${cookie.secure:false}")
+    @Value("${app.cookie.secure:false}")
     private boolean cookieSecure;
 
     @PostMapping("/register")
@@ -130,7 +130,7 @@ public class AuthController {
             return new AuthResponse(401, "未登录");
         }
         return userRepository.findById(userId)
-                .map(user -> AuthResponse.me(user.getUsername(), user.getEmail()))
+                .map(user -> AuthResponse.me(user.getUsername(), user.getEmail(), user.getRealName()))
                 .orElse(new AuthResponse(404, "用户不存在"));
     }
 }

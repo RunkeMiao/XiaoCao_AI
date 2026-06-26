@@ -18,30 +18,50 @@ import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-@Component
 public class RedisChatMemory implements ChatMemory {
 
     private static final Logger log = LoggerFactory.getLogger(RedisChatMemory.class);
     private static final String PREFIX = "chat:mem:";
 
-    // 上下文配置
-    private static final int MAX_MESSAGES = 6;          // 最多保留6条消息
+    // 固定配置
     private static final int MAX_CONTENT_LENGTH = 3000; // 每条消息最长3000字符
-    private static final int COMPRESS_THRESHOLD = 4;    // 超过4条消息时触发压缩
-    private static final int KEEP_RECENT_MESSAGES = 2;  // 压缩时保留最近2条消息
     private static final int SUMMARY_MAX_LENGTH = 500;  // 摘要最大长度
     private static final int TRUNCATE_FALLBACK_LENGTH = 200; // 降级截断长度
     private static final long TTL_HOURS = 24;
+
+    // 可配置参数
+    private final int maxMessages;
+    private final int compressThreshold;
+    private final int keepRecentMessages;
 
     private final StringRedisTemplate redis;
     private final ObjectMapper mapper;
     private final ChatClient chatClient;
 
+    // 压缩专用线程池（避免占用主保存线程）
+    private final ExecutorService compressExecutor;
+
     public RedisChatMemory(StringRedisTemplate redis, ObjectMapper mapper, @Lazy ChatClient chatClient) {
+        this(redis, mapper, chatClient, 6, 4, 2);
+    }
+
+    public RedisChatMemory(StringRedisTemplate redis, ObjectMapper mapper, @Lazy ChatClient chatClient,
+                           int maxMessages, int compressThreshold, int keepRecentMessages) {
         this.redis = redis;
         this.mapper = mapper;
         this.chatClient = chatClient;
+        this.maxMessages = maxMessages;
+        this.compressThreshold = compressThreshold;
+        this.keepRecentMessages = keepRecentMessages;
+        this.compressExecutor = Executors.newFixedThreadPool(2, r -> {
+            Thread t = new Thread(r, "chat-memory-compress");
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     @PostConstruct
@@ -61,8 +81,8 @@ public class RedisChatMemory implements ChatMemory {
                 List<String> jsonList = redis.opsForList().range(key, 0, -1);
                 redis.delete(key);
                 if (jsonList == null) continue;
-                // 只保留最后 MAX_MESSAGES 条
-                int start = Math.max(0, jsonList.size() - MAX_MESSAGES);
+                // 只保留最后 maxMessages 条
+                int start = Math.max(0, jsonList.size() - maxMessages);
                 for (int i = start; i < jsonList.size(); i++) {
                     try {
                         MsgDto dto = mapper.readValue(jsonList.get(i), MsgDto.class);
@@ -98,13 +118,19 @@ public class RedisChatMemory implements ChatMemory {
                 }
                 redis.opsForList().rightPush(key, mapper.writeValueAsString(dto));
             }
-            redis.opsForList().trim(key, -MAX_MESSAGES, -1);
+            redis.opsForList().trim(key, -maxMessages, -1);
             redis.expire(key, java.time.Duration.ofHours(TTL_HOURS));
 
-            // 检查是否需要压缩
+            // 检查是否需要压缩（异步执行，不阻塞主流程）
             Long size = redis.opsForList().size(key);
-            if (size != null && size >= COMPRESS_THRESHOLD) {
-                compressContext(conversationId);
+            if (size != null && size >= compressThreshold) {
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        compressContext(conversationId);
+                    } catch (Exception e) {
+                        log.warn("异步压缩上下文失败: {}", e.getMessage());
+                    }
+                }, compressExecutor);
             }
 
         } catch (Exception e) {
@@ -149,12 +175,12 @@ public class RedisChatMemory implements ChatMemory {
         String key = PREFIX + conversationId;
         try {
             List<String> jsonList = redis.opsForList().range(key, 0, -1);
-            if (jsonList == null || jsonList.size() <= KEEP_RECENT_MESSAGES) {
+            if (jsonList == null || jsonList.size() <= keepRecentMessages) {
                 return; // 消息数量未达到压缩阈值
             }
 
             // 分离旧消息和新消息
-            int splitIndex = jsonList.size() - KEEP_RECENT_MESSAGES;
+            int splitIndex = jsonList.size() - keepRecentMessages;
             List<String> oldMessages = jsonList.subList(0, splitIndex);
             List<String> newMessages = jsonList.subList(splitIndex, jsonList.size());
 
