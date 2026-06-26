@@ -66,9 +66,7 @@ export function useChat() {
     async function switchSession(id) {
         if (isStreaming.value) return
 
-        console.log('切换会话 - id:', id)
         sessionId.value = id
-        console.log('切换会话后 - sessionId.value:', sessionId.value)
         await loadSessionMessages(id)
     }
 
@@ -88,13 +86,10 @@ export function useChat() {
      */
     async function createNewSession() {
         try {
-            console.log('调用createSession API')
             const response = await chatApi.createSession()
             if (response.ok) {
                 const data = await response.json()
-                console.log('createSession返回数据:', data)
                 sessionId.value = data.sessionId
-                console.log('设置sessionId.value为:', sessionId.value)
 
                 // 更新历史列表
                 chatHistory.value.unshift({
@@ -128,13 +123,9 @@ export function useChat() {
                 chatHistory.value = chatHistory.value.filter(h => h.id !== id)
 
                 if (sessionId.value === id) {
-                    if (chatHistory.value.length > 0) {
-                        await switchSession(chatHistory.value[0].id)
-                    } else {
-                        // 没有会话了，显示空状态
-                        sessionId.value = ''
-                        messages.value = []
-                    }
+                    // 删除的是当前会话，显示欢迎界面
+                    sessionId.value = ''
+                    messages.value = []
                 }
             }
         } catch (e) {
@@ -167,20 +158,14 @@ export function useChat() {
     async function sendMessage(text) {
         if (isStreaming.value || !text.trim()) return
 
-        console.log('发送消息前 - sessionId:', sessionId.value)
-
         // 如果没有当前会话，创建新会话
         if (!sessionId.value) {
-            console.log('sessionId为空，创建新会话')
             const sid = await createNewSession()
             if (!sid) {
                 console.error('无法创建会话')
                 return
             }
-            console.log('新会话创建成功 - sessionId:', sid)
         }
-
-        console.log('发送消息 - sessionId:', sessionId.value)
 
         // 添加用户消息到界面
         messages.value.push({role: 'user', content: text})
@@ -256,7 +241,7 @@ export function useChat() {
 
             // 第一轮对话后，自动生成标题
             if (messages.value.length === 2) {
-                generateSmartTitle()
+                await generateSmartTitle()
             }
 
         } catch (e) {

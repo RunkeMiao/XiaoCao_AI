@@ -1,5 +1,8 @@
 <template>
-  <aside class="sidebar" :class="{ collapsed }">
+  <!-- 移动端遮罩层 -->
+  <div v-if="isMobile && !collapsed" class="sidebar-overlay" @click="collapsed = true"></div>
+
+  <aside class="sidebar" :class="{ collapsed, 'mobile': isMobile }">
     <!-- 退出登录确认弹窗 -->
     <ConfirmModal
       v-model:visible="showLogoutModal"
@@ -27,7 +30,7 @@
     </div>
 
     <!-- 新对话按钮 -->
-    <button class="btn-new-chat" @click="$emit('new-chat')">
+    <button class="btn-new-chat" @click="handleNewChat">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="12" y1="5" x2="12" y2="19"></line>
         <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -63,11 +66,11 @@
             :key="item.id"
             class="history-item"
             :class="{ active: item.id === currentSessionId }"
-            @click="$emit('switch-session', item.id)"
+            @click="handleSwitchSession(item.id)"
             role="button"
             tabindex="0"
-            @keydown.enter="$emit('switch-session', item.id)"
-            @keydown.space.prevent="$emit('switch-session', item.id)"
+            @keydown.enter="handleSwitchSession(item.id)"
+            @keydown.space.prevent="handleSwitchSession(item.id)"
         >
           <span class="history-title">{{ item.title }}</span>
           <span class="history-time">{{ formatTime(item.updatedAt) }}</span>
@@ -102,21 +105,45 @@
 </template>
 
 <script setup>
-import {ref} from 'vue'
+import {ref, computed, onMounted, onUnmounted} from 'vue'
 import {useAuth} from '../composables/useAuth.js'
 import ConfirmModal from './ConfirmModal.vue'
 
 const {username, logout} = useAuth()
 
-defineProps({
+const props = defineProps({
   chatHistory: {type: Array, default: () => []},
-  currentSessionId: {type: String, default: ''}
+  currentSessionId: {type: String, default: ''},
+  collapsed: {type: Boolean, default: false}
 })
 
-defineEmits(['new-chat', 'switch-session', 'delete-session'])
+const emit = defineEmits(['new-chat', 'switch-session', 'delete-session', 'update:collapsed'])
 
-const collapsed = ref(false)
 const showLogoutModal = ref(false)
+const isMobile = ref(false)
+
+// 计算collapsed状态
+const collapsed = computed({
+  get: () => props.collapsed,
+  set: (value) => emit('update:collapsed', value)
+})
+
+// 检测是否为移动端
+function checkMobile() {
+  isMobile.value = window.innerWidth < 768
+  if (isMobile.value) {
+    emit('update:collapsed', true)
+  }
+}
+
+onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+})
 
 function handleLogout() {
   showLogoutModal.value = true
@@ -124,6 +151,20 @@ function handleLogout() {
 
 function confirmLogout() {
   logout()
+}
+
+function handleNewChat() {
+  emit('new-chat')
+  if (isMobile.value) {
+    collapsed.value = true
+  }
+}
+
+function handleSwitchSession(id) {
+  emit('switch-session', id)
+  if (isMobile.value) {
+    collapsed.value = true
+  }
 }
 
 function formatTime(timestamp) {
@@ -138,6 +179,17 @@ function formatTime(timestamp) {
 </script>
 
 <style scoped>
+/* 移动端遮罩层 */
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+}
+
 .sidebar {
   width: 260px;
   min-width: 260px;
@@ -146,7 +198,7 @@ function formatTime(timestamp) {
   flex-direction: column;
   background: var(--sidebar-bg);
   border-right: 1px solid var(--sidebar-border);
-  transition: width 0.25s ease, min-width 0.25s ease;
+  transition: width 0.25s ease, min-width 0.25s ease, transform 0.25s ease;
   overflow: hidden;
 }
 
@@ -157,6 +209,24 @@ function formatTime(timestamp) {
 
 .sidebar.collapsed .btn-toggle {
   margin: 0 auto;
+}
+
+/* 移动端样式 */
+.sidebar.mobile {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: 280px;
+  min-width: 280px;
+  transform: translateX(0);
+}
+
+.sidebar.mobile.collapsed {
+  width: 0;
+  min-width: 0;
+  transform: translateX(-100%);
+  border-right: none;
 }
 
 /* Header */

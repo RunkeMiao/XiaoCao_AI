@@ -4,16 +4,27 @@
     <Sidebar
         :chat-history="chatHistory"
         :current-session-id="sessionId"
+        :collapsed="sidebarCollapsed"
         @new-chat="handleNewChat"
         @switch-session="switchSession"
         @delete-session="deleteSession"
+        @update:collapsed="sidebarCollapsed = $event"
     />
 
     <!-- 主区域 -->
     <main class="main-area">
       <!-- 顶部标题栏 -->
       <header class="topbar">
-        <h1 class="topbar-title">XiaoCao AI</h1>
+        <div class="topbar-left">
+          <button class="btn-menu" @click="toggleSidebar" title="菜单">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <h1 class="topbar-title">XiaoCao AI</h1>
+        </div>
         <button class="btn-theme" @click="toggleTheme" :title="isDark ? '切换浅色' : '切换深色'">
           <svg v-if="isDark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="1.8">
@@ -126,6 +137,11 @@ const input = ref('')
 const inputRef = ref(null)
 const chatInputRef = ref(null)
 const messagesRef = ref(null)
+const sidebarCollapsed = ref(false)
+
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
 
 async function handleSend() {
   const text = input.value.trim()
@@ -231,6 +247,7 @@ onMounted(async () => {
   font-weight: 650;
   letter-spacing: 0.02em;
   color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .btn-theme {
@@ -251,6 +268,38 @@ onMounted(async () => {
   background: var(--hover-bg);
   color: var(--text-primary);
   border-color: var(--text-muted);
+}
+
+/* 汉堡菜单按钮 */
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-menu {
+  display: none;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.btn-menu:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+@media (max-width: 767px) {
+  .btn-menu {
+    display: flex;
+  }
 }
 
 /* ===== Messages ===== */

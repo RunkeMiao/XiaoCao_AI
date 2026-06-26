@@ -20,7 +20,9 @@ import top.xiaocaohub.aichat.dto.SaveMessageRequest;
 import top.xiaocaohub.aichat.service.ChatService;
 
 import java.util.ArrayList;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @RestController
@@ -55,7 +57,6 @@ public class ChatController {
 
         // 使用用户ID隔离Redis中的聊天记忆
         String conversationId = userId + ":" + request.sessionId();
-        log.info("聊天请求 - userId: {}, sessionId: {}, conversationId: {}", userId, request.sessionId(), conversationId);
 
         // 为当前请求创建advisor，设置conversationId
         Advisor advisor = MessageChatMemoryAdvisor.builder(chatMemory)
@@ -95,10 +96,8 @@ public class ChatController {
                 .advisors(a -> a.param("chat_memory_conversation_id", conversationId))
                 .stream()
                 .content()
-                .doOnComplete(() -> log.info("SSE流完成"))
-                .doOnError(e -> log.warn("SSE流错误: {}", e.getMessage()))
                 .onErrorResume(e -> {
-                    log.warn("SSE 流结束异常（数据已发送）: {}", e.getMessage());
+                    log.warn("SSE流异常: {}", e.getMessage());
                     return Flux.empty();
                 });
     }
@@ -147,21 +146,16 @@ public class ChatController {
      */
     private void rebuildRedisContext(String sessionId, Long userId) {
         String conversationId = userId + ":" + sessionId;
-        log.info("尝试重建Redis上下文: {}", conversationId);
         try {
             // 检查Redis中是否已有上下文
             List<Message> existing = chatMemory.get(conversationId);
-            log.info("Redis中现有消息数: {}", existing.size());
             if (!existing.isEmpty()) {
-                log.info("Redis中已有上下文，跳过重建");
                 return; // 已有上下文，不需要重建
             }
 
             // 从数据库加载最近的消息
             List<ChatMessageResponse> messages = chatService.getSessionMessagesInternal(sessionId);
-            log.info("数据库中消息数: {}", messages.size());
             if (messages.isEmpty()) {
-                log.info("数据库中没有消息，跳过重建");
                 return;
             }
 
@@ -176,14 +170,13 @@ public class ChatController {
                 }
             }
 
-            log.info("准备写入Redis的消息数: {}", recentMessages.size());
             // 写入Redis
             if (!recentMessages.isEmpty()) {
                 chatMemory.add(conversationId, recentMessages);
-                log.info("重建Redis上下文完成: {}, 加载{}条消息", conversationId, recentMessages.size());
+                log.info("重建Redis上下文: {}, 加载{}条消息", conversationId, recentMessages.size());
             }
         } catch (Exception e) {
-            log.error("重建Redis上下文失败: {}", e.getMessage(), e);
+            log.warn("重建Redis上下文失败: {}", e.getMessage());
         }
     }
 

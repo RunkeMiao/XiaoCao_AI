@@ -86,7 +86,6 @@ public class RedisChatMemory implements ChatMemory {
     @Override
     public void add(String conversationId, List<Message> messages) {
         String key = PREFIX + conversationId;
-        log.info("Redis写入 - conversationId: {}, key: {}, 消息数: {}", conversationId, key, messages.size());
         try {
             for (Message msg : messages) {
                 MsgDto dto = MsgDto.from(msg);

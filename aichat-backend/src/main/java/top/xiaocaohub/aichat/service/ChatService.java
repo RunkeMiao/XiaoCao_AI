@@ -2,6 +2,7 @@ package top.xiaocaohub.aichat.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import top.xiaocaohub.aichat.dto.ChatMessageResponse;
@@ -22,6 +23,7 @@ public class ChatService {
 
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final ChatMemory chatMemory;
 
     /**
      * 创建新会话
@@ -122,8 +124,18 @@ public class ChatService {
         ChatSession session = chatSessionRepository.findBySessionIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new RuntimeException("会话不存在或无权访问"));
 
+        // 删除数据库
         chatMessageRepository.deleteBySessionId(sessionId);
         chatSessionRepository.delete(session);
+
+        // 删除Redis中的上下文
+        String conversationId = userId + ":" + sessionId;
+        try {
+            chatMemory.clear(conversationId);
+            log.info("已清理Redis上下文: {}", conversationId);
+        } catch (Exception e) {
+            log.warn("清理Redis上下文失败: {}", e.getMessage());
+        }
     }
 
     /**
