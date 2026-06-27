@@ -2,7 +2,6 @@ const BASE_URL = ''
 
 let refreshing = false
 let refreshQueue = []
-let redirecting = false
 
 /**
  * 尝试刷新 Token
@@ -34,6 +33,7 @@ async function tryRefresh() {
 
 /**
  * 封装 fetch，自动携带 Cookie，401 时自动刷新
+ * 注意：不处理重定向，由路由守卫统一处理
  */
 export async function request(url, options = {}) {
   const headers = {
@@ -57,12 +57,8 @@ export async function request(url, options = {}) {
         headers,
         credentials: 'include',
       })
-    } else if (!redirecting) {
-      // 刷新失败，跳转登录（只跳转一次）
-      redirecting = true
-      window.location.href = '/login'
-      return res
     }
+    // 刷新失败时直接返回 401，由路由守卫处理重定向
   }
 
   return res

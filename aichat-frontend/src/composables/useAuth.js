@@ -42,7 +42,6 @@ export function useAuth() {
   }
 
   async function logout() {
-    console.log('logout() called')
     try {
       const res = await post('/api/auth/logout', {})
       console.log('Logout response:', res.status)
@@ -50,13 +49,10 @@ export function useAuth() {
       console.error('Logout request failed:', e)
     }
     // 无论请求是否成功，都清除本地状态
-    console.log('Clearing local state...')
     isLoggedIn.value = false
     username.value = ''
     realName.value = ''
-    checked.value = false
-    console.log('Redirecting to /login...')
-    window.location.href = '/login'
+    checked.value = true  // 标记已检查，避免重新请求
   }
 
   return {

@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @RestController
@@ -36,7 +38,8 @@ public class ChatController {
 
     private static final String SYSTEM_PROMPT = """
             # 角色
-            你是一个专业、友好的 AI 助手，擅长清晰地解答问题和分析数据。
+            你是一个专业、友好的 AI 助手，擅长清晰地解答股票问题和分析股票数据。
+            你是由BUG制造机小组制作出来的，组长是苗润轲，小组成员有刘恒磊、王佳辉、李佳涛、王伟。
 
             # 输出规范（Markdown）
             - 标题独占一行，前后空行；段落间用空行分隔。
@@ -59,7 +62,6 @@ public class ChatController {
             | getZtStocks(date) | 涨停股池 | date: "2025-01-15" |
             | getDtStocks(date) | 跌停股池 | 同上 |
             | getQsStocks(date) | 强势股池 | 同上 |
-            | getNewStocks() | 新股列表 | 无参数 |
             | getCompanyInfo(stockCode) | 公司简介 | stockCode: 纯数字 |
             | getDividendHistory(stockCode) | 历年分红 | 同上 |
             | getTopShareholders(stockCode) | 十大股东 | 同上 |
@@ -115,19 +117,29 @@ public class ChatController {
         Advisor advisor = MessageChatMemoryAdvisor.builder(chatMemory)
                 .build();
 
-        // 用于收集AI回复的StringBuilder
-        StringBuilder aiResponse = new StringBuilder();
+        // 使用线程安全的方式收集AI回复
+        AtomicReference<StringBuilder> aiResponseRef = new AtomicReference<>(new StringBuilder());
+        AtomicBoolean saved = new AtomicBoolean(false);
 
         // 保存AI回复的辅助方法
         Runnable saveAiResponse = () -> {
-            String aiReply = aiResponse.toString();
-            if (!aiReply.isEmpty() && !aiReply.contains("⚠️")) {
+            if (saved.getAndSet(true)) {
+                log.info("AI回复已保存过，跳过: sessionId={}", sessionId);
+                return; // 避免重复保存
+            }
+            String aiReply = aiResponseRef.get().toString();
+            log.info("准备保存AI回复, sessionId={}, 长度={}", sessionId, aiReply.length());
+            if (!aiReply.isEmpty()) {
                 try {
                     chatService.saveMessage(sessionId, "assistant", aiReply);
-                    log.debug("AI回复已保存到数据库: {}", sessionId);
+                    log.info("AI回复已保存到数据库: {}, 内容长度: {}", sessionId, aiReply.length());
                 } catch (Exception e) {
-                    log.warn("保存AI回复失败: {}", e.getMessage());
+                    log.error("保存AI回复失败: {}", e.getMessage(), e);
+                    saved.set(false); // 保存失败，允许重试
                 }
+            } else {
+                log.warn("AI回复为空，跳过保存: sessionId={}", sessionId);
+                saved.set(false); // 回复为空，允许重试
             }
         };
 
@@ -140,12 +152,32 @@ public class ChatController {
                 .stream()
                 .content()
                 .retry(1)
-                .doOnNext(chunk -> aiResponse.append(chunk))  // 收集每个chunk
-                .doOnComplete(saveAiResponse::run)  // 正常结束时保存
+                .doOnNext(chunk -> {
+                    // 线程安全地追加
+                    synchronized (aiResponseRef) {
+                        aiResponseRef.get().append(chunk);
+                    }
+                    log.debug("收到chunk: {}", chunk);
+                })  // 收集每个chunk
+                .doOnComplete(() -> {
+                    log.info("流式输出完成，触发保存: sessionId={}, 总长度={}", sessionId, aiResponseRef.get().length());
+                    saveAiResponse.run();
+                })  // 正常结束时保存
                 .doOnCancel(() -> {
                     // 用户取消时保存已生成的部分回复
-                    log.info("用户取消了流式生成，保存部分回复: {}", sessionId);
+                    log.info("用户取消了流式生成，保存部分回复: sessionId={}, 当前长度={}", sessionId, aiResponseRef.get().length());
                     saveAiResponse.run();
+                })
+                .doOnError(e -> {
+                    log.error("流式输出出错: sessionId={}, error={}", sessionId, e.getMessage(), e);
+                })
+                .doFinally(signal -> {
+                    log.info("流式信号结束: sessionId={}, signal={}, 已收集长度={}, 已保存={}", sessionId, signal, aiResponseRef.get().length(), saved.get());
+                    // 如果 doOnComplete/doOnCancel 没有触发保存，这里作为最后保障
+                    if (!saved.get() && aiResponseRef.get().length() > 0) {
+                        log.warn("doFinally 触发保障保存: sessionId={}", sessionId);
+                        saveAiResponse.run();
+                    }
                 })
                 .onErrorResume(e -> {
                     log.warn("流式调用失败(已重试)，降级为非流式: {}", e.getMessage());
@@ -158,7 +190,7 @@ public class ChatController {
                                 .call()
                                 .content();
                         // 非流式降级也要保存到数据库
-                        if (fallback != null && !fallback.contains("⚠️")) {
+                        if (fallback != null && !fallback.startsWith("⚠️")) {
                             chatService.saveMessage(sessionId, "assistant", fallback);
                         }
                         return Flux.just(fallback != null ? fallback : "⚠️ 服务暂时不可用，请稍后重试。");

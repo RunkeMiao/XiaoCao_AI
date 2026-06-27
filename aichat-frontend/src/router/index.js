@@ -39,16 +39,18 @@ router.beforeEach(async (to, from, next) => {
   await checkLogin()
 
   if (isLoggedIn.value) {
+    // 已登录，禁止访问登录/注册页
     if (['login', 'register', 'forgot-password'].includes(to.name)) {
-      next('/')
+      next({name: 'chat'})
     } else {
       next()
     }
   } else {
-    if (to.name === 'chat') {
-      next('/login')
-    } else {
+    // 未登录，只允许访问登录/注册/忘记密码页
+    if (['login', 'register', 'forgot-password'].includes(to.name)) {
       next()
+    } else {
+      next({name: 'login'})
     }
   }
 })

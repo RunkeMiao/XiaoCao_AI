@@ -8,6 +8,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import top.xiaocaohub.aichat.dto.ChatMessageResponse;
 import top.xiaocaohub.aichat.dto.ChatSessionResponse;
 import top.xiaocaohub.aichat.dto.PageResponse;
@@ -32,6 +33,7 @@ public class ChatService {
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ChatMemory chatMemory;
+    private final TransactionTemplate transactionTemplate;
 
     /**
      * 创建新会话
@@ -147,17 +149,18 @@ public class ChatService {
     }
 
     /**
-     * 保存消息
+     * 保存消息（使用编程式事务，兼容响应式流回调）
      */
-    @Transactional
     public void saveMessage(String sessionId, String role, String content) {
-        ChatMessage message = ChatMessage.builder()
-                .sessionId(sessionId)
-                .role(role)
-                .content(content)
-                .build();
-
-        chatMessageRepository.save(message);
+        transactionTemplate.executeWithoutResult(status -> {
+            ChatMessage message = ChatMessage.builder()
+                    .sessionId(sessionId)
+                    .role(role)
+                    .content(content)
+                    .build();
+            chatMessageRepository.save(message);
+            log.debug("消息已保存: sessionId={}, role={}, length={}", sessionId, role, content.length());
+        });
     }
 
     /**

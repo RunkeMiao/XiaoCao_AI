@@ -126,9 +126,11 @@
 
 <script setup>
 import {ref, computed, onMounted, onUnmounted} from 'vue'
+import {useRouter} from 'vue-router'
 import {useAuth} from '../composables/useAuth.js'
 import ConfirmModal from './ConfirmModal.vue'
 
+const router = useRouter()
 const {username, realName, logout} = useAuth()
 
 // 优先显示真实姓名，否则显示用户名
@@ -172,8 +174,9 @@ function handleLogout() {
   showLogoutModal.value = true
 }
 
-function confirmLogout() {
-  logout()
+async function confirmLogout() {
+  await logout()
+  router.push('/login')
 }
 
 function handleNewChat() {

@@ -11,7 +11,7 @@ spring:
   # AI 配置
   ai:
     openai:
-      base-url: https://api.siliconflow.cn
+      base-url: https://api.siliconflow.cn/v1
       api-key: ${AI_API_KEY:sk-xxx}  # 通过环境变量注入
       chat:
         model: zai-org/GLM-5.2

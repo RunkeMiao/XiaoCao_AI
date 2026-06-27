@@ -46,7 +46,7 @@ public class RedisChatMemory implements ChatMemory {
     private final ExecutorService compressExecutor;
 
     public RedisChatMemory(StringRedisTemplate redis, ObjectMapper mapper, @Lazy ChatClient chatClient) {
-        this(redis, mapper, chatClient, 6, 4, 2);
+        this(redis, mapper, chatClient, 20, 15, 6);
     }
 
     public RedisChatMemory(StringRedisTemplate redis, ObjectMapper mapper, @Lazy ChatClient chatClient,
