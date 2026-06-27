@@ -13,6 +13,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
+
+import jakarta.servlet.http.HttpServletResponse;
 import top.xiaocaohub.aichat.dto.ChatMessageResponse;
 import top.xiaocaohub.aichat.dto.ChatRequest;
 import top.xiaocaohub.aichat.dto.ChatSessionResponse;
@@ -82,7 +84,12 @@ public class ChatController {
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> chat(@RequestBody ChatRequest request,
-                            @AuthenticationPrincipal Long userId) {
+                            @AuthenticationPrincipal Long userId,
+                            HttpServletResponse response) {
+        // 防止代理/浏览器缓冲SSE流，改善手机端流式体验
+        response.setHeader("Cache-Control", "no-cache, no-transform");
+        response.setHeader("X-Accel-Buffering", "no");
+        response.setHeader("Connection", "keep-alive");
         // 输入验证
         InputSanitizer.ValidationResult validation = inputSanitizer.validate(request.message());
         if (!validation.valid()) {
@@ -113,10 +120,10 @@ public class ChatController {
 
         // 保存AI回复的辅助方法
         Runnable saveAiResponse = () -> {
-            String response = aiResponse.toString();
-            if (!response.isEmpty() && !response.contains("⚠️")) {
+            String aiReply = aiResponse.toString();
+            if (!aiReply.isEmpty() && !aiReply.contains("⚠️")) {
                 try {
-                    chatService.saveMessage(sessionId, "assistant", response);
+                    chatService.saveMessage(sessionId, "assistant", aiReply);
                     log.debug("AI回复已保存到数据库: {}", sessionId);
                 } catch (Exception e) {
                     log.warn("保存AI回复失败: {}", e.getMessage());

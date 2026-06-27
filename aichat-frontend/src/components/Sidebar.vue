@@ -67,6 +67,10 @@
             class="history-item"
             :class="{ active: item.id === currentSessionId }"
             @click="handleSwitchSession(item.id)"
+            @touchstart="onTouchStart($event, item.id)"
+            @touchend="onTouchEnd"
+            @touchmove="onTouchEnd"
+            @touchcancel="onTouchEnd"
             role="button"
             tabindex="0"
             @keydown.enter="handleSwitchSession(item.id)"
@@ -84,6 +88,22 @@
         <div v-if="chatHistory.length === 0" class="history-empty">暂无对话记录</div>
       </div>
     </div>
+
+    <!-- 移动端长按操作弹窗 -->
+    <Teleport to="body">
+      <div v-if="contextMenu.visible" class="context-menu-overlay" @click="contextMenu.visible = false">
+        <div class="context-menu" :style="{ top: contextMenu.y + 'px' }">
+          <button class="context-menu-item danger" @click="handleContextDelete">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span>删除对话</span>
+          </button>
+          <button class="context-menu-item" @click="contextMenu.visible = false">取消</button>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 底部用户信息 -->
     <div class="sidebar-footer" v-show="!collapsed">
@@ -164,10 +184,49 @@ function handleNewChat() {
 }
 
 function handleSwitchSession(id) {
+  if (longPressed) return
   emit('switch-session', id)
   if (isMobile.value) {
     collapsed.value = true
   }
+}
+
+// ===== 移动端长按删除 =====
+let longPressTimer = null
+let longPressed = false
+
+const contextMenu = ref({
+  visible: false,
+  y: 0,
+  sessionId: null
+})
+
+function onTouchStart(e, sessionId) {
+  if (!isMobile.value) return
+  longPressed = false
+  const touch = e.touches[0]
+  longPressTimer = setTimeout(() => {
+    longPressed = true
+    contextMenu.value = {
+      visible: true,
+      y: Math.min(touch.clientY, window.innerHeight - 120),
+      sessionId
+    }
+  }, 500)
+}
+
+function onTouchEnd() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+}
+
+function handleContextDelete() {
+  if (contextMenu.value.sessionId) {
+    emit('delete-session', contextMenu.value.sessionId)
+  }
+  contextMenu.value.visible = false
 }
 
 function formatTime(timestamp) {
@@ -197,6 +256,7 @@ function formatTime(timestamp) {
   width: 260px;
   min-width: 260px;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--sidebar-bg);
@@ -521,5 +581,68 @@ function formatTime(timestamp) {
 .btn-logout:hover {
   background: var(--sidebar-hover);
   color: #e74c3c;
+}
+
+/* ===== 移动端长按弹窗 ===== */
+.context-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.context-menu {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  min-width: 180px;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  animation: contextSlideUp 0.15s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes contextSlideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.context-menu-item {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.context-menu-item:active {
+  background: var(--hover-bg);
+}
+
+.context-menu-item.danger {
+  color: #e74c3c;
+  border-bottom: 1px solid var(--border-color);
 }
 </style>

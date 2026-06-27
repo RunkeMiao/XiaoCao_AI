@@ -21,7 +21,8 @@ body {
   font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
-  height: 100vh;
+  height: 100vh; /* fallback */
+  height: 100dvh; /* 移动端动态视口，排除地址栏/底栏 */
   overflow: hidden;
 }
 </style>

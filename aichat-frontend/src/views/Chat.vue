@@ -158,16 +158,6 @@ async function handleSend() {
   
   // 发送消息
   await sendMessage(text)
-  
-  // 等待 DOM 更新（可能从欢迎页切换到聊天页）
-  await nextTick()
-  
-  // 重新获取输入框引用并聚焦
-  await new Promise(resolve => setTimeout(resolve, 50))
-  const newInput = chatInputRef.value || inputRef.value
-  if (newInput) {
-    newInput.focus()
-  }
 }
 
 function handleNewChat() {
@@ -195,12 +185,14 @@ watch([messages, sessionId], async () => {
   if (messagesRef.value) {
     messagesRef.value.scrollTop = messagesRef.value.scrollHeight
   }
-  
-  // 消息更新后，保持输入框焦点
-  await nextTick()
-  const inputEl = chatInputRef.value || inputRef.value
-  if (inputEl && !inputEl.disabled) {
-    inputEl.focus()
+
+  // 电脑端：消息更新后自动聚焦输入框；手机端：不聚焦，避免弹出键盘
+  if (window.innerWidth >= 768) {
+    await nextTick()
+    const inputEl = chatInputRef.value || inputRef.value
+    if (inputEl && !inputEl.disabled) {
+      inputEl.focus()
+    }
   }
 }, {deep: true, immediate: true})
 
@@ -218,6 +210,7 @@ onMounted(async () => {
 .app-layout {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   width: 100%;
 }
 
@@ -477,5 +470,44 @@ textarea:disabled {
   font-size: 11.5px;
   color: var(--text-muted);
   margin-top: 10px;
+}
+
+/* ===== 移动端适配 ===== */
+@media (max-width: 767px) {
+  .topbar {
+    padding: 0 16px;
+    height: 50px;
+  }
+
+  .messages {
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .input-area {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .input-wrapper {
+    border-radius: 14px;
+    padding: 8px 12px;
+  }
+
+  .welcome h2 {
+    font-size: 20px;
+  }
+
+  .welcome-input-wrapper {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 14px;
+    padding: 10px 14px;
+  }
+
+  .bubble {
+    max-width: 92%;
+    padding: 12px 16px;
+    font-size: 14px;
+  }
 }
 </style>
